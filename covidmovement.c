@@ -95,7 +95,7 @@ int* central(int*location, int* cen, int time){
 		}
 
 	}
-	return newloc
+	return newloc;
 
 }
 
