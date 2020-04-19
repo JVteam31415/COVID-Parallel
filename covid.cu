@@ -61,7 +61,7 @@ static inline void covid_initMaster(unsigned int pop_size, size_t world_width, s
 		g_population[i].symptoms = false;
 	}
 
-
+    // test commit
 
 }
 
