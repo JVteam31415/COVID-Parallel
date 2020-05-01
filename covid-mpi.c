@@ -56,7 +56,8 @@ int main(int argc, char** argv) {
     //alright let's try to output some stuff
     MPI_File filename;
 
-
+    MPI_File_open(MPI_COMM_WORLD, "covid.txt", MPI_MODE_CREATE|MPI_MODE_RDWR,  MPI_INFO_NULL, &filename);
+    MPI_File_close(&filename);
     
 	for( int i = 0; i <days*24; i++)
 	{
@@ -96,8 +97,24 @@ int main(int argc, char** argv) {
 		
 		if(days%24==23){
 			//write to file
-			MPI_File_open(MPI_COMM_WORLD, "covid.txt",/*???*/,MPI_INFO_NULL, &filename);
-			MPI_File_write(filename,/*??*/);
+			MPI_File_open(MPI_COMM_WORLD, "covid.txt",MPI_MODE_RDWR,MPI_INFO_NULL, &filename);
+			char* toPrint;
+			toPrint = (char*)malloc((amountRows*world_width)*sizeof(char));
+			for(int j=0;j<amountRows*world_width;j++){
+				if(d_population[j]==0){
+					toPrint[j]=' ';
+				}
+				else if(d_population[j].day_infected ==/*never infected*/ ){
+					toPrint[j] = 'H';
+				}
+				else if(d_population[j].day_infected > (i/24)-14 ){
+					toPrint[j] = 'I';
+				}
+				else{
+					toPrint[j] = 'R';
+				}
+			}
+			MPI_File_write(filename,toPrint  ,amountRows*world_width, MPI_INT,MPI_STATUS_IGNORE);
 			MPI_File_close(&filename);
 		}
 		
