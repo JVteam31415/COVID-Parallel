@@ -1,17 +1,36 @@
 #include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <stdbool.h>
 
 typedef struct
 {
-	int x, y, day_infected, R, state;
+	int x, y, time_infected, R, state;
 	bool symptoms;
 } person;
 //might need to do this for it to compile,  just in case, it's here
 
 extern void covid_initMaster(unsigned int pop_size, size_t world_width, size_t world_height);
-extern bool covid_kernelLaunch(person** d_population, person** d_result, size_t world_width, size_t world_height, size_t pop_size, size_t iterations, int myrank, int numranks);
 
+extern bool covid_kernelLaunch(
+    person** d_population, 
+    person** d_result, 
+    size_t world_width, 
+    size_t world_height, 
+    size_t pop_size, 
+    int time, 
+    unsigned int radius, 
+    float infect_chance, 
+    int symptom_chance, 
+    unsigned int recover, 
+    int threshold, 
+    int behavior1, 
+    int behavior2, 
+    int myrank, 
+    int numranks
+);
+//extern bool covid_kernelLaunch(person** d_population, person** d_result, size_t world_width, size_t world_height, size_t pop_size, int time, unsigned int radius, float infect_chance, unsigned int recover, int myrank, int numranks);
 
 person *d_population=NULL;
 person *d_result=NULL; //
@@ -21,21 +40,27 @@ int main(int argc, char** argv) {
     // Initialize the MPI environment
     MPI_Init(&argc, &argv);
 
-    unsigned int pop_size, world_width, world_height, infection_radius, infection_chance, days, ranks;
+    unsigned int pop_size, world_width, world_height, infection_radius, infect_chance, days, ranks, symptom_chance, recovery_time, threshold, behavior1, behavior2;
 
 	
 
-    if( argc != 6 )
+    if( argc != 11 )
     {
-	printf("This requires 5 arguments in its current form\n");
+	printf("This requires 10 arguments in its current form\n");
 	exit(-1);
     }
     
     pop_size = atoi(argv[1]);
 	world_width = atoi(argv[2]);
 	world_height = atoi(argv[3]);
-	infection_radius = atoi(argv[4]);
-	days = atoi (argv[5]);
+	days = atoi (argv[4]);
+	infection_radius = atoi(argv[5]);
+    infect_chance = atof(argv[6]);
+    symptom_chance = atof(argv[7]);
+    recovery_time = atoi(argv[8]);
+    threshold = atoi(argv[9]);
+    behavior1 = atoi(argv[10]);
+    behavior2 = atoi(argv[10]);
 
     // Get the rank of the process
     int world_rank;
@@ -45,7 +70,7 @@ int main(int argc, char** argv) {
 
     //Even distribution of pops as of right now
 	int popsPerRank;
-	popsPerRank = pop_size/num_processes    
+	popsPerRank = pop_size/num_processes;
     
     /*
 	Allocate My Rank’s chunk of the universe*/
@@ -93,7 +118,7 @@ int main(int argc, char** argv) {
 
 		bool ret;
 		
-		ret = covid_kernelLaunch( &d_population, &d_result, world_width, amount+2, popsPerRank, 1, world_rank, num_processes); 
+		ret = covid_kernelLaunch( &d_population, &d_result, world_width, amountRows+2, popsPerRank, i, infection_radius, infect_chance, symptom_chance, recovery_time, threshold, behavior1, behavior2, world_rank, num_processes); 
 		
 		if(days%24==23){
 			//write to file
@@ -101,13 +126,13 @@ int main(int argc, char** argv) {
 			char* toPrint;
 			toPrint = (char*)malloc((amountRows*world_width)*sizeof(char));
 			for(int j=0;j<amountRows*world_width;j++){
-				if(d_population[j]==0){
+				/*if(d_population[j] == NULL){
 					toPrint[j]=' ';
 				}
-				else if(d_population[j].day_infected ==/*never infected*/ ){
-					toPrint[j] = 'H';
+				else*/ if (d_population[j].state == 0 ){
+					toPrint[j] = 'S';
 				}
-				else if(d_population[j].day_infected > (i/24)-14 ){
+				else if(d_population[j].state == 1 ){
 					toPrint[j] = 'I';
 				}
 				else{
