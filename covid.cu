@@ -22,7 +22,7 @@ typedef struct
 person *g_population=NULL;
 
 // people stored by location
-person ***g_world=NULL;
+//person ***g_world=NULL;
 
 // Current width of world.
 size_t g_worldWidth=0;
@@ -40,14 +40,14 @@ static inline void covid_initMaster(unsigned int pop_size, size_t world_width, s
 
 	// 
 	int world_area = g_worldHeight * g_worldWidth;
-	float pop_density = g_popsize / world_area;
+	float pop_density = g_popSize / world_area;
 	int depth = ceil(pop_density)*5;
 
 
 	cudaMallocManaged((void**)&g_population, g_popSize*sizeof(person));
 	person *world;
-	cudaMallocManaged((void**)world, g_worldHeight*g_worldWidth*depth*sizeof(person));
-	g_world = (person (**)[depth]) world;
+	//cudaMallocManaged((void**)world, g_worldHeight*g_worldWidth*depth*sizeof(person));
+	//g_world = (person (**)[depth]) world;
 
 	for (int i=0; i<g_popSize; ++i) {
 		int x = rand() % (g_worldWidth + 1);
@@ -55,9 +55,9 @@ static inline void covid_initMaster(unsigned int pop_size, size_t world_width, s
 
 		g_population[i].x = x;
 		g_population[i].y = y;
-		g_population[i].day_infected = NULL;
+		g_population[i].day_infected = -1;
 		g_population[i].R = 0;
-		g_population[i].sate = 0;
+		g_population[i].state = 0;
 		g_population[i].symptoms = false;
 	}
 
@@ -78,5 +78,7 @@ int main(int argc, char *argv[]) {
 	srand(time(0));
 	covid_initMaster(pop_size, world_width, world_height);
 
-
+    for (int i=0; i < g_popSize; ++i) {
+        printf("%d, %d\n", g_population[i].x, g_population[i].y);
+    }
 }
