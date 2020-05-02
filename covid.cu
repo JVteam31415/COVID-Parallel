@@ -21,6 +21,8 @@ typedef struct
 // all of the people
 person *g_population=NULL;
 
+person *g_result=NULL;
+
 // people stored by location
 //person ***g_world=NULL;
 
@@ -64,6 +66,28 @@ static inline void covid_initMaster(unsigned int pop_size, size_t world_width, s
     // test commit
 
 }
+
+
+__global__
+void covid_kernel(const person* d_population, person* d_result, unsigned int world_width, unsigned int world_height, unsigned int pop_size, int myrank, int numranks) {
+	int index = blockIdx.x * blockDim.x + threadIdx.x;
+
+	while (index < pop_size) {
+		// if infected, check within radius to spread infection
+
+		// check global status to decide behavior
+
+		// take step
+
+	}
+}
+
+bool covid_kernelLaunch(person** d_population, person** d_result, size_t world_width, size_t world_height, size_t pop_size, size_t iterations, int myrank, int numranks) {
+	covid_kernel<<1,1>>(*d_population, *d_result, (int)world_width, (int)world_height, pop_size, myrank, numranks)
+	cudaDeviceSynchronize()
+	return true;
+}
+
 
 int main(int argc, char *argv[]) {
 	unsigned int pop_size, world_width, world_height, infection_radius, infection_chance, days;
