@@ -198,7 +198,7 @@ void central(int x, int y, int cen_x, int cen_y, int time, int *new_x, int *new_
 static inline void covid_swap(person **p1, person **p2) {
     person *temp = *p1;
     *p1 = *p2;
-    *p2 = *temp;
+    *p2 = temp;
 }
 
 __global__
