@@ -35,7 +35,7 @@ size_t g_worldHeight=0;
 
 size_t g_popSize = 0;
 
-static inline void covid_initMaster(unsigned int pop_size, size_t world_width, size_t world_height, curandState *state) {
+extern "C" void covid_initMaster(unsigned int pop_size, size_t world_width, size_t world_height) {
 	g_worldWidth = world_width;
 	g_worldHeight = world_height;
 	g_popSize = pop_size;
@@ -88,7 +88,6 @@ __device__
 int max(int a, int b) {
     return (a > b) ? a : b;
 }
-
 __device__
 int min(int a, int b) {
     return (a < b) ? a : b;
@@ -298,7 +297,7 @@ __global__ void setup_kernel(curandState *state){
     curand_init(1234, idx, 0, &state[idx]);
 }
 
-bool covid_kernelLaunch(
+extern "C" bool covid_kernelLaunch(
     person** d_population, 
     person** d_result, 
     size_t world_width, 
@@ -327,20 +326,16 @@ bool covid_kernelLaunch(
 /*
 int main(int argc, char *argv[]) {
 	unsigned int pop_size, world_width, world_height, infection_radius, infection_infect_chance, days;
-
 	pop_size = atoi(argv[1]);
 	world_width = atoi(argv[2]);
 	world_height = atoi(argv[3]);
 	infection_radius = atoi(argv[4]);
 	days = atoi (argv[4]);
 	unsigned int timesteps = days*24;
-
 	srand(time(0));
 	covid_initMaster(pop_size, world_width, world_height);
-
     for (int i=0; i < g_popSize; ++i) {
         printf("%d, %d\n", g_population[i].x, g_population[i].y);
     }
 }
 */
-

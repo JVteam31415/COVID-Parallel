@@ -22,7 +22,7 @@ extern bool covid_kernelLaunch(
     int time, 
     unsigned int radius, 
     float infect_chance, 
-    int symptom_chance, 
+    float symptom_chance, 
     unsigned int recover, 
     int threshold, 
     int behavior1, 
@@ -40,8 +40,8 @@ int main(int argc, char** argv) {
     // Initialize the MPI environment
     MPI_Init(&argc, &argv);
 
-    unsigned int pop_size, world_width, world_height, infection_radius, infect_chance, days, ranks, symptom_chance, recovery_time, threshold, behavior1, behavior2;
-
+    unsigned int pop_size, world_width, world_height, infection_radius,  days,  recovery_time, threshold, behavior1, behavior2;
+    float infect_chance, symptom_chance;
 	
 
     if( argc != 11 )
@@ -54,13 +54,16 @@ int main(int argc, char** argv) {
 	world_width = atoi(argv[2]);
 	world_height = atoi(argv[3]);
 	days = atoi (argv[4]);
+
 	infection_radius = atoi(argv[5]);
     infect_chance = atof(argv[6]);
     symptom_chance = atof(argv[7]);
     recovery_time = atoi(argv[8]);
+    
     threshold = atoi(argv[9]);
     behavior1 = atoi(argv[10]);
-    behavior2 = atoi(argv[10]);
+    behavior2 = atoi(argv[10]); //this is supposed to be 10 as well?
+
 
     // Get the rank of the process
     int world_rank;
