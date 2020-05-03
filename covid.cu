@@ -194,6 +194,13 @@ void central(int x, int y, int cen_x, int cen_y, int time, int *new_x, int *new_
 	}
 
 }
+
+static inline void covid_swap(person **p1, person **p2) {
+    person *temp = *p1;
+    *p1 = *p2;
+    *p2 = *temp;
+}
+
 __global__
 void covid_kernel(
     const person* d_population, 
@@ -320,6 +327,7 @@ extern "C" bool covid_kernelLaunch(
     qsort(*d_population, pop_size, sizeof(person), compare);
     setup_kernel<<<1,1>>>(d_state);
     covid_kernel<<<1,1>>>(*d_population, *d_result, (int)world_width, (int)world_height, time, pop_size, radius, infect_chance, symptom_chance, infect_search, recover, threshold, behavior1, behavior2, myrank, numranks, d_state);
+    covid_swap(d_population, d_result);
     cudaDeviceSynchronize();
     return true;
 }
