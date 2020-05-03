@@ -44,9 +44,9 @@ int main(int argc, char** argv) {
     float infect_chance, symptom_chance;
 	
 
-    if( argc != 11 )
+    if( argc != 12 )
     {
-	printf("This requires 10 arguments in its current form\n");
+	printf("This requires 11 arguments in its current form\n");
 	exit(-1);
     }
     
@@ -59,10 +59,10 @@ int main(int argc, char** argv) {
     infect_chance = atof(argv[6]);
     symptom_chance = atof(argv[7]);
     recovery_time = atoi(argv[8]);
-    
+
     threshold = atoi(argv[9]);
     behavior1 = atoi(argv[10]);
-    behavior2 = atoi(argv[10]); //this is supposed to be 10 as well?
+    behavior2 = atoi(argv[11]); 
 
 
     // Get the rank of the process
