@@ -89,6 +89,7 @@ int main(int argc, char** argv) {
     }
     printf("%d: amountRows: %d\n", world_rank, amountRows);
 
+
     covid_initMaster( popsPerRank, world_width, amountRows, &d_population );
 
 
@@ -103,10 +104,10 @@ int main(int argc, char** argv) {
     printf("%d: file opened\n", world_rank);
 
 
-    int highestRow = (world_rank+1)*amountRows-1;
-    int lowestRow = world_rank*amountRows;
-    int lowestRowHere = 0;
-    int highestRowHere = highestRow - lowestRow;
+    int lowestRow = (world_rank*(amountRows+1) )-1;
+    int highestRow = world_rank*amountRows;
+    int highestRowHere = 0;
+    int lowestRowHere = amountRows-1;
     printf("%d: high: %d, low: %d\n", world_rank, highestRowHere, lowestRowHere);
 
     printf("%d: %d\n", world_rank, d_population[0].y);
@@ -127,20 +128,18 @@ int main(int argc, char** argv) {
 
 		/*
 		1) this node has a list of people
-
 		2) it sends a list of its people that are on the top row of its area 
 		and its area's bottom row to the nodes above and below (this does not remove them from its own list)
-
 		3)it then receives a list of the people the row above its area and a list of the people the row below it
 		*/
-		printf("%d: finished requests\n", world_rank);
+		printf("row 134 %d: finished requests\n", world_rank);
 		int top = 0;
 		int bot = 0;
 		for (int j=0;j<numPopsHere;j++){
-			if(d_population[j].y==highestRowHere){
+			if(d_population[j].y<=highestRowHere){
 				top++;
 			}
-			else if(d_population[j].y==lowestRowHere){
+			else if(d_population[j].y>=lowestRowHere){
 				bot++;
 			}
 		}
@@ -148,29 +147,27 @@ int main(int argc, char** argv) {
 		person* topRow = (person*)malloc(top*sizeof(person));
 		person* botRow = (person*)malloc(bot*sizeof(person));
 
-		printf("%d: top: %d, bot: %d\n", world_rank, top, bot);
+		printf("row 149 %d: top: %d, bot: %d\n", world_rank, top, bot);
 		int tc = 0;
 		int bc = 0;
 		int counter = 0;
 		while( (tc<top)&&(bc<bot)){
-			if(d_population[counter].y==highestRowHere ){
+			if(d_population[counter].y<=highestRowHere){
 				topRow[tc]=d_population[counter];
 				tc++;
 			}
-			else if(d_population[counter].y==lowestRowHere){
+			else if(d_population[counter].y>=lowestRowHere){
 				botRow[bc]=d_population[counter];
 				bc++;
 			}
 			counter++;
 		}
 
-		printf("%d: populated topRow, botRow\n", world_rank);
+		printf("row 165 %d: populated topRow, botRow\n", world_rank);
 
 		/* 
 		4)It adds the people in the list it receives to ITS OWN LIST OF PEOPLE FOR THE KERNEL 
-
 		5)Kernel operates, and gives all people in this node's list a new location
-
 		6)remove people outside boundaries from the node's list of people
 		*/
 		int upperBot;
@@ -247,10 +244,12 @@ int main(int argc, char** argv) {
 
 		person* newPopulation = (person*)malloc( (numPopsHere+upperBot+lowerTop)*sizeof(person));
 		for(int j=0;j<upperBot;j++){
+			upperBotRow[j].y = -1;
 			newPopulation[j] = upperBotRow[j];
 		} 
 
 		for(int j=0;j<lowerTop;j++){
+			lowerTopRow[j].y = amountRows;
 			newPopulation[upperBot+j] = lowerTopRow[j];
 		} 
 
@@ -271,10 +270,10 @@ int main(int argc, char** argv) {
 
 		for (int j=0; j<upperBot+lowerTop+numPopsHere;j++ ){
 
-			if(d_population[j].y > highestRowHere){
+			if(d_population[j].y < highestRowHere){
 
 			}
-			else if(d_population[j].y < lowestRowHere){
+			else if(d_population[j].y > lowestRowHere){
 
 			}
 			else{
@@ -286,10 +285,10 @@ int main(int argc, char** argv) {
 		actual = 0;
 		for (int j=0; j<upperBot+lowerTop+numPopsHere;j++ ){
 
-			if(d_population[j].y > highestRowHere){
+			if(d_population[j].y < highestRowHere){
 
 			}
-			else if(d_population[j].y < lowestRowHere){
+			else if(d_population[j].y > lowestRowHere){
 
 			}
 			else{
@@ -297,6 +296,7 @@ int main(int argc, char** argv) {
 				actual++;
 			}
 		}
+		numPopsHere = actual;
 		d_population = actualPopulation;
         printf("%d: inserted actual pop\n", world_rank);		
 
@@ -306,7 +306,7 @@ int main(int argc, char** argv) {
 			MPI_File_open(MPI_COMM_WORLD, "covid.txt",MPI_MODE_RDWR,MPI_INFO_NULL, &filename);
 			char* toPrint;
 			toPrint = (char*)malloc((amountRows*world_width)*sizeof(char));
-			for(int j=0;j<amountRows*world_width;j++){
+			for(int j=0;j<numPopsHere;j++){
 				/*if(d_population[j] == NULL){
 					toPrint[j]=' ';
 				}
