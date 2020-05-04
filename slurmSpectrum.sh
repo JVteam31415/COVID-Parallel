@@ -20,5 +20,5 @@ module load gcc/7.4.0/1
 module load spectrum-mpi
 module load cuda
 
-mpirun -hostfile /tmp/hosts.$SLURM_JOB_ID -np $SLURM_NPROCS covid-cuda-mpi.out  50 128 128  20 2 0.25  0.99 14 10  0 1
+mpirun -hostfile /tmp/hosts.$SLURM_JOB_ID -np $SLURM_NPROCS covid-cuda-mpi.out  70 13 13 20 2 0.25  0.99 14 10  0 1
 rm /tmp/hosts.$SLURM_JOB_ID
