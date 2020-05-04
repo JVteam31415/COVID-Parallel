@@ -35,7 +35,7 @@ size_t g_worldHeight=0;
 
 size_t g_popSize = 0;
 
-extern "C" void covid_initMaster(unsigned int pop_size, size_t world_width, size_t world_height) {
+extern "C" void covid_initMaster(unsigned int pop_size, size_t world_width, size_t world_height, person** d_population) {
 	g_worldWidth = world_width;
 	g_worldHeight = world_height;
 	g_popSize = pop_size;
@@ -47,7 +47,7 @@ extern "C" void covid_initMaster(unsigned int pop_size, size_t world_width, size
 	int depth = ceil(pop_density)*5;
 
 
-	cudaMallocManaged((void**)&g_population, g_popSize*sizeof(person));
+	cudaMallocManaged((void**)d_population, g_popSize*sizeof(person));
 	//person *world;
 	//cudaMallocManaged((void**)world, g_worldHeight*g_worldWidth*depth*sizeof(person));
 	//g_world = (person (**)[depth]) world;
@@ -56,12 +56,12 @@ extern "C" void covid_initMaster(unsigned int pop_size, size_t world_width, size
 		int x = rand() % (g_worldWidth);
 		int y = rand() % (g_worldHeight);
 
-		g_population[i].x = x;
-		g_population[i].y = y;
-		g_population[i].time_infected = -1;
-		g_population[i].R = 0;
-		g_population[i].state = 0;
-		g_population[i].symptoms = false;
+		(*d_population)[i].x = x;
+		(*d_population)[i].y = y;
+		(*d_population)[i].time_infected = -1;
+		(*d_population)[i].R = 0;
+		(*d_population)[i].state = 0;
+		(*d_population)[i].symptoms = false;
 	}
 
 }

@@ -11,7 +11,7 @@ typedef struct
 } person;
 //might need to do this for it to compile,  just in case, it's here
 
-extern void covid_initMaster(unsigned int pop_size, size_t world_width, size_t world_height);
+extern void covid_initMaster(unsigned int pop_size, size_t world_width, size_t world_height, person** d_population);
 
 extern bool covid_kernelLaunch(
     person** d_population, 
@@ -78,7 +78,9 @@ int main(int argc, char** argv) {
     /*
 	Allocate My Rank’s chunk of the universe*/
     int amountRows = world_height / num_processes; //# of rows of the chunk, each row being world_width long
-    covid_initMaster( popsPerRank, world_width, amountRows+2 );
+
+
+    covid_initMaster( popsPerRank, world_width, amountRows, &d_population );
 
 
     int numPopsHere = popsPerRank;
@@ -95,6 +97,7 @@ int main(int argc, char** argv) {
     int highestRowHere = world_rank*amountRows;
     int lowestRowHere = (world_rank+1)*amountRows-1;
 
+    printf("%d\n", d_population[0].y);
 
 
 	for( int i = 0; i <days*24; i++)
@@ -115,6 +118,7 @@ int main(int argc, char** argv) {
 
 		3)it then receives a list of the people the row above its area and a list of the people the row below it
 		*/
+		printf("finished requests\n");
 		int top = 0;
 		int bot = 0;
 		for (int j=0;j<numPopsHere;j++){
@@ -129,6 +133,7 @@ int main(int argc, char** argv) {
 		person* topRow = (person*)malloc(top*sizeof(person));
 		person* botRow = (person*)malloc(bot*sizeof(person));
 
+		printf("top, bottom found\n");
 		int tc = 0;
 		int bc = 0;
 		int counter = 0;
@@ -144,7 +149,7 @@ int main(int argc, char** argv) {
 			counter++;
 		}
 
-
+		printf("line 149\n");
 
 		/* 
 		4)It adds the people in the list it receives to ITS OWN LIST OF PEOPLE FOR THE KERNEL 
@@ -185,22 +190,22 @@ int main(int argc, char** argv) {
 
 
 		if(world_rank!=0){
-			MPI_Irecv( &(upperBotRow),                       upperBot, MPI_INT,       (world_rank-1)%num_processes,              1, MPI_COMM_WORLD, &requests0 );
+			MPI_Irecv( (upperBotRow),                       upperBot, MPI_INT,       (world_rank-1)%num_processes,              1, MPI_COMM_WORLD, &requests0 );
 		
 		}
 		printf("first one finished\n");
 		if(world_rank!=num_processes-1){
-			MPI_Irecv( &(lowerTopRow),    		 lowerTop, MPI_INT,	    (world_rank+1)%num_processes,              1, MPI_COMM_WORLD,&requests1 ); //size?
+			MPI_Irecv( (lowerTopRow),    		 lowerTop, MPI_INT,	    (world_rank+1)%num_processes,              1, MPI_COMM_WORLD,&requests1 ); //size?
 		
 		}
 		printf("second one finished\n");
 		if(world_rank!=0){
-			MPI_Isend( &(topRow),              top, MPI_INT,      (num_processes+world_rank-1)%num_processes, 1, MPI_COMM_WORLD,&requests2 );
+			MPI_Isend( (topRow),              top, MPI_INT,      (num_processes+world_rank-1)%num_processes, 1, MPI_COMM_WORLD,&requests2 );
 		}
 
 		printf("third one finished\n");
 		if(world_rank!=num_processes-1){
-			MPI_Isend( &(botRow),    bot, MPI_INT,      (world_rank+1)%num_processes,               1, MPI_COMM_WORLD,&requests3 );
+			MPI_Isend( (botRow),    bot, MPI_INT,      (world_rank+1)%num_processes,               1, MPI_COMM_WORLD,&requests3 );
 		}
 
 		printf("fourth one finished\n");
