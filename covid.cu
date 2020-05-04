@@ -24,6 +24,7 @@ typedef struct
 // all of the people
 person *g_population=NULL;
 
+person *g_result=NULL;
 // people stored by location
 //person ***g_world=NULL;
 
@@ -35,7 +36,7 @@ size_t g_worldHeight=0;
 
 size_t g_popSize = 0;
 
-extern "C" void covid_initMaster(unsigned int pop_size, size_t world_width, size_t world_height, person** d_population) {
+extern "C" void covid_initMaster(unsigned int pop_size, size_t world_width, size_t world_height, person** d_population, person** d_result, curandState **d_state) {
 	g_worldWidth = world_width;
 	g_worldHeight = world_height;
 	g_popSize = pop_size;
@@ -48,6 +49,7 @@ extern "C" void covid_initMaster(unsigned int pop_size, size_t world_width, size
 
 
 	cudaMallocManaged((void**)d_population, g_popSize*sizeof(person));
+    cudaMallocManaged((void**)d_result, g_popSize*sizeof(person));
 	//person *world;
 	//cudaMallocManaged((void**)world, g_worldHeight*g_worldWidth*depth*sizeof(person));
 	//g_world = (person (**)[depth]) world;
@@ -62,11 +64,24 @@ extern "C" void covid_initMaster(unsigned int pop_size, size_t world_width, size
 		(*d_population)[i].R = 0;
 		(*d_population)[i].state = 0;
 		(*d_population)[i].symptoms = false;
+
+		(*d_result)[i].x = x;
+		(*d_population)[i].y = y;
+		(*d_population)[i].time_infected = -1;
+		(*d_population)[i].R = 0;
+		(*d_population)[i].state = 0;
+		(*d_population)[i].symptoms = false;
 	}
 
+    int patient_zero = rand()%pop_size;
+    (*d_population)[patient_zero].state = 1;
+    (*d_population)[patient_zero].time_infected = 0;
+    (*d_population)[patient_zero].symptoms = true;
+    
+    cudaMallocManaged((void**)d_state, sizeof(curandState));
 }
 
-__device__
+//__device__
 int compare(const void* a, const void* b) {
     // sort into bins based on x+y
     person p1 = * ( (person*) a);
@@ -99,6 +114,7 @@ int get_curand(curandState *state, int index, int min, int max) {
     float myrandf = curand_uniform(state+index);
     myrandf *= (max - min+0.999999);
     myrandf += min;
+    printf("get_curand: %d", (int)truncf(myrandf));
     return (int)truncf(myrandf);
 }
 
@@ -319,31 +335,61 @@ extern "C" bool covid_kernelLaunch(
     int behavior1, 
     int behavior2, 
     int myrank, 
-    int numranks
+    int numranks,
+    curandState *d_state
 ) {
     int dim_max = max(world_width, world_height);
     int infect_search = ceil((2*radius + 1) * dim_max / 2);
-    curandState *d_state;
+    //curandState *d_state;
+    
+    printf("before sort\n");
     qsort(*d_population, pop_size, sizeof(person), compare);
-    setup_kernel<<<1,1>>>(d_state);
+    printf("after sort\n");
+    printf("before covid_kernel\n");
     covid_kernel<<<1,1>>>(*d_population, *d_result, (int)world_width, (int)world_height, time, pop_size, radius, infect_chance, symptom_chance, infect_search, recover, threshold, behavior1, behavior2, myrank, numranks, d_state);
+    printf("after covid_kernel\n");
     covid_swap(d_population, d_result);
     cudaDeviceSynchronize();
     return true;
 }
-/*
+
 int main(int argc, char *argv[]) {
-	unsigned int pop_size, world_width, world_height, infection_radius, infection_infect_chance, days;
-	pop_size = atoi(argv[1]);
-	world_width = atoi(argv[2]);
-	world_height = atoi(argv[3]);
-	infection_radius = atoi(argv[4]);
-	days = atoi (argv[4]);
-	unsigned int timesteps = days*24;
+	unsigned int pop_size = 70, 
+                 world_width = 13, 
+                 world_height = 13, 
+                 infection_radius = 2, 
+                 iterations = 1,
+                 recover = 7*24,
+                 threshold = 10,
+                 behavior1 = 0,
+                 behavior2 = 1,
+                 world_rank = 0,
+                num_processes = 1;
+    float infect_chance = 0.2,
+          symptom_chance = 0.8;
+    
+    curandState *d_state;
+	//pop_size = atoi(argv[1]);
+	//world_width = atoi(argv[2]);
+	//world_height = atoi(argv[3]);
+	//infection_radius = atoi(argv[4]);
+	//days = atoi (argv[4]);
+	//unsigned int timesteps = days*24;
 	srand(time(0));
-	covid_initMaster(pop_size, world_width, world_height);
-    for (int i=0; i < g_popSize; ++i) {
-        printf("%d, %d\n", g_population[i].x, g_population[i].y);
+    printf("before init\n");
+	covid_initMaster(pop_size, world_width, world_height, &g_population, &g_result, &d_state);
+    printf("after init\n");
+
+    printf("before setup_kernel\n");
+    setup_kernel<<<1,1>>>(d_state);
+    printf("after setup_kernel\n");
+    //for (int i=0; i < g_popSize; ++i) {
+    //    printf("%d, %d\n", g_population[i].x, g_population[i].y);
+    //}
+    for (int i = 0; i < iterations; ++i) {
+        printf("iteration: %d\n", i);
+        covid_kernelLaunch(&g_population, &g_result, world_width, world_height, pop_size, i, infection_radius, infect_chance, symptom_chance, recover, threshold, behavior1, behavior2, world_rank, num_processes, d_state);
     }
+
 }
-*/
+
