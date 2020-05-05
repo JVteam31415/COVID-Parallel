@@ -191,8 +191,8 @@ int main(int argc, char** argv) {
 		5)Kernel operates, and gives all people in this node's list a new location
 		6)remove people outside boundaries from the node's list of people
 		*/
-		int upperBot;
-		int lowerTop;
+		int upperBot = 0 ;
+		int lowerTop = 0;
 		if(world_rank!=0){
 			MPI_Irecv( &(upperBot), 1, MPI_INT, (world_rank-1)%num_processes, 1, MPI_COMM_WORLD, &requests0 );
 		
@@ -214,14 +214,19 @@ int main(int argc, char** argv) {
 		printf("%d: 4 finished\n", world_rank);
 
 
-		MPI_Wait(&requests0, MPI_SUCCESS);
-		printf("%d: countwait0\n", world_rank);
-		MPI_Wait(&requests1, MPI_SUCCESS);
-		printf("%d: countwait1\n", world_rank);
-		MPI_Wait(&requests2, MPI_SUCCESS);
-		printf("%d: countwait2\n", world_rank);
-		MPI_Wait(&requests3, MPI_SUCCESS);
-		printf("%d: countwait3\n", world_rank);
+		if(world_rank!=0){
+			MPI_Wait(&requests0, MPI_SUCCESS);
+			printf("%d: countwait0\n", world_rank);
+			MPI_Wait(&requests2, MPI_SUCCESS);
+			printf("%d: countwait2\n", world_rank);
+		}
+
+		if(world_rank!=num_processes-1){
+			MPI_Wait(&requests1, MPI_SUCCESS);
+			printf("%d: countwait1\n", world_rank);
+			MPI_Wait(&requests3, MPI_SUCCESS);
+			printf("%d: countwait3\n", world_rank);
+		}
 
 		person* lowerTopRow= (person*)malloc(lowerTop*sizeof(person));
 		printf("%d: lowerTopRow allocated\n", world_rank);
@@ -258,14 +263,22 @@ int main(int argc, char** argv) {
 
 		printf("%d: fourth one finished\n", world_rank);
 		
-		MPI_Wait(&requests0, MPI_SUCCESS);
-        printf("%d: wait1\n", world_rank);
-		MPI_Wait(&requests1, MPI_SUCCESS);
-        printf("%d: wait2\n", world_rank);
-		MPI_Wait(&requests2, MPI_SUCCESS);
-        printf("%d: wait3\n", world_rank);
-		MPI_Wait(&requests3, MPI_SUCCESS);
-		printf("%d: Done waiting\n", world_rank);
+		if(world_rank!=0 && upperBot > 0){
+			MPI_Wait(&requests0, MPI_SUCCESS);
+        	printf("%d: wait1\n", world_rank);
+    	}
+    	if(world_rank!=num_processes-1 && lowerTop > 0){
+			MPI_Wait(&requests1, MPI_SUCCESS);
+        	printf("%d: wait2\n", world_rank);
+        }
+        if(world_rank!=0 && top > 0){
+			MPI_Wait(&requests2, MPI_SUCCESS);
+	        printf("%d: wait3\n", world_rank);
+	    }
+	    if(world_rank!=num_processes-1 && bot > 0){
+			MPI_Wait(&requests3, MPI_SUCCESS);
+			printf("%d: Done waiting\n", world_rank);
+		}
 
 		bool ret;
 
@@ -361,4 +374,3 @@ int main(int argc, char** argv) {
 	
 
 }
-
