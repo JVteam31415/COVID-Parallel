@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <limits.h>
+#include <string.h>
 
 typedef struct
 {
@@ -63,7 +64,7 @@ int main(int argc, char** argv) {
 
     if( argc != 12 )
     {
-	printf("This requires 11 arguments in its current form\n");
+//	printf("This requires 11 arguments in its current form\n");
 	exit(-1);
     }
     
@@ -104,7 +105,7 @@ int main(int argc, char** argv) {
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
     int num_processes;
     MPI_Comm_size(MPI_COMM_WORLD, &num_processes);
-    printf("%d: num_processes: %d\n", world_rank, num_processes);
+//    printf("%d: num_processes: %d\n", world_rank, num_processes);
 
     //Even distribution of pops as of right now
 	int popsPerRank;
@@ -113,7 +114,7 @@ int main(int argc, char** argv) {
         popsPerRank += pop_size % num_processes;
     }
     
-    printf("%d: popsPerRank: %d\n", world_rank, popsPerRank);
+//    printf("%d: popsPerRank: %d\n", world_rank, popsPerRank);
     /*
 	Allocate My Rank’s chunk of the universe*/
     int amountRows = world_height / num_processes; //# of rows of the chunk, each row being world_width long
@@ -121,15 +122,15 @@ int main(int argc, char** argv) {
     if (world_rank == 0) {
         amountRows += world_height % num_processes;
     }
-    printf("%d: amountRows: %d\n", world_rank, amountRows);
+//    printf("%d: amountRows: %d\n", world_rank, amountRows);
 
-    printf("%d: before initMaster\n", world_rank);
+//    printf("%d: before initMaster\n", world_rank);
 //==================================================================================================================
     covid_initMaster( popsPerRank, world_width, amountRows, &d_population, &d_result, world_rank, pop_size);
 //==================================================================================================================
-    printf("%d: after initMaster, before setup_kernelLaunch\n", world_rank);
+//    printf("%d: after initMaster, before setup_kernelLaunch\n", world_rank);
     setup_kernelLaunch();
-    printf("%d: after setup_kernelLaunch\n", world_rank);
+//    printf("%d: after setup_kernelLaunch\n", world_rank);
 
     int numPopsHere = popsPerRank;
 
@@ -139,24 +140,24 @@ int main(int argc, char** argv) {
     MPI_File_open(MPI_COMM_WORLD, "covid.txt", MPI_MODE_CREATE|MPI_MODE_RDWR,  MPI_INFO_NULL, &filename);
     MPI_File_close(&filename);
     
-    printf("%d: file opened\n", world_rank);
+//    printf("%d: file opened\n", world_rank);
 
 
     int lowestRow = (world_rank*(amountRows+1) )-1;
     int highestRow = world_rank*amountRows;
     int highestRowHere = 0;
     int lowestRowHere = amountRows-1;
-    printf("%d: high: %d, low: %d\n", world_rank, highestRowHere, lowestRowHere);
+//    printf("%d: high: %d, low: %d\n", world_rank, highestRowHere, lowestRowHere);
 
-    printf("%d: %d\n", world_rank, d_population[0].y);
+//    printf("%d: %d\n", world_rank, d_population[0].y);
 
     for (int k = 0; k < popsPerRank; ++k) {
-        printf("%d: p: %d x: %d, y: %d, high: %d, low: %d\n", world_rank, k, d_population[k].x, d_population[k].y, highestRowHere, lowestRowHere);
+//        printf("%d: p: %d x: %d, y: %d, high: %d, low: %d\n", world_rank, k, d_population[k].x, d_population[k].y, highestRowHere, lowestRowHere);
     }
 
 	for( int i = 0; i <days; i++)
 	{
-		printf("started iteration %d of for loop, on processor %d\n", i, world_rank);
+//		printf("started iteration %d of for loop, on processor %d\n", i, world_rank);
 	/*Exchange row data with MPI Ranks
 	using MPI_Isend/Irecv.*/
 		MPI_Request requests0;
@@ -170,16 +171,16 @@ int main(int argc, char** argv) {
 		and its area's bottom row to the nodes above and below (this does not remove them from its own list)
 		3)it then receives a list of the people the row above its area and a list of the people the row below it
 		*/
-		printf("row 134 %d: finished requests\n", world_rank);
+//		printf("row 134 %d: finished requests\n", world_rank);
 		int top = 0;
 		int bot = 0;
 		for (int j=0;j<numPopsHere;j++){
 			if(d_population[j].y<=highestRowHere){
-                printf("%d: TOP COUNT y: %d <= %d\n", world_rank, d_population[j].y, highestRowHere);
+  //              printf("%d: TOP COUNT y: %d <= %d\n", world_rank, d_population[j].y, highestRowHere);
 				top++;
 			}
 			else if(d_population[j].y>=lowestRowHere){
-                printf("%d: BOT COUNT y: %d >= %d\n", world_rank, d_population[j].y, lowestRowHere);
+//                printf("%d: BOT COUNT y: %d >= %d\n", world_rank, d_population[j].y, lowestRowHere);
 				bot++;
 			}
 		}
@@ -187,7 +188,7 @@ int main(int argc, char** argv) {
 		person* topRow = (person*)malloc(top*sizeof(person));
 		person* botRow = (person*)malloc(bot*sizeof(person));
 
-		printf("row 149 %d: top: %d, bot: %d\n", world_rank, top, bot);
+//		printf("row 149 %d: top: %d, bot: %d\n", world_rank, top, bot);
 		int tc = 0;
 		int bc = 0;
 		int counter = 0;
@@ -195,14 +196,14 @@ int main(int argc, char** argv) {
             //printf("%d: counter: %d, numPopsHere: %d\n", world_rank, counter, numPopsHere);
 			if(d_population[counter].y<=highestRowHere){
                 
-                printf("%d: TOP BUILD counter: %d x: %d, y: %d, state: %d\n", world_rank, counter, d_population[counter].x, d_population[counter].y, d_population[counter].state);
+//                printf("%d: TOP BUILD counter: %d x: %d, y: %d, state: %d\n", world_rank, counter, d_population[counter].x, d_population[counter].y, d_population[counter].state);
 
 				topRow[tc]=d_population[counter];
 				tc++;
 			}
 			else if(d_population[counter].y>=lowestRowHere){
 
-                printf("%d: BOT BUILD counter: %d x: %d, y: %d, state: %d\n", world_rank, counter, d_population[counter].x, d_population[counter].y, d_population[counter].state);
+  //              printf("%d: BOT BUILD counter: %d x: %d, y: %d, state: %d\n", world_rank, counter, d_population[counter].x, d_population[counter].y, d_population[counter].state);
 
 				botRow[bc]=d_population[counter];
 				bc++;
@@ -211,14 +212,14 @@ int main(int argc, char** argv) {
 		}
 
         for (int i=0; i < top; ++i) {
-            printf("%d: TOP x: %d, y: %d, state: %d\n", world_rank, topRow[i].x, topRow[i].y, topRow[i].state);
+//            printf("%d: TOP x: %d, y: %d, state: %d\n", world_rank, topRow[i].x, topRow[i].y, topRow[i].state);
         }
         for (int i=0; i < bot; ++i) {
-            printf("%d: BOT x: %d, y: %d, state: %d\n", world_rank, botRow[i].x, botRow[i].y, botRow[i].state);
+  //          printf("%d: BOT x: %d, y: %d, state: %d\n", world_rank, botRow[i].x, botRow[i].y, botRow[i].state);
         }
 
 
-		printf("row 165 %d: populated topRow, botRow\n", world_rank);
+//		printf("row 165 %d: populated topRow, botRow\n", world_rank);
 
 		/* 
 		4)It adds the people in the list it receives to ITS OWN LIST OF PEOPLE FOR THE KERNEL 
@@ -231,43 +232,43 @@ int main(int argc, char** argv) {
 			MPI_Irecv( &(upperBot), 1, MPI_INT, (world_rank-1)%num_processes, 1, MPI_COMM_WORLD, &requests0 );
 		
 		}
-		printf("%d: 1 finished\n", world_rank);
+//		printf("%d: 1 finished\n", world_rank);
 		if(world_rank!=num_processes-1){
 			MPI_Irecv( &(lowerTop), 1, MPI_INT, (world_rank+1)%num_processes, 1, MPI_COMM_WORLD,&requests1 ); //size?
 		
 		}
-		printf("%d: 2 finished\n", world_rank);
+//		printf("%d: 2 finished\n", world_rank);
 		if(world_rank!=0){
 			MPI_Isend( &top, 1, MPI_INT, (num_processes+world_rank-1)%num_processes, 1, MPI_COMM_WORLD,&requests2 );
 		}
 
-		printf("%d: 3 finished\n", world_rank);
+//		printf("%d: 3 finished\n", world_rank);
 		if(world_rank!=num_processes-1){
 			MPI_Isend( &bot, 1, MPI_INT, (world_rank+1)%num_processes, 1, MPI_COMM_WORLD,&requests3 );
 		}
-		printf("%d: 4 finished\n", world_rank);
+//		printf("%d: 4 finished\n", world_rank);
 
 
 		if(world_rank!=0){
 			MPI_Wait(&requests0, MPI_SUCCESS);
-			printf("%d: countwait0\n", world_rank);
+//			printf("%d: countwait0\n", world_rank);
 			MPI_Wait(&requests2, MPI_SUCCESS);
-			printf("%d: countwait2\n", world_rank);
+//			printf("%d: countwait2\n", world_rank);
 		}
 
 		if(world_rank!=num_processes-1){
 			MPI_Wait(&requests1, MPI_SUCCESS);
-			printf("%d: countwait1\n", world_rank);
+//			printf("%d: countwait1\n", world_rank);
 			MPI_Wait(&requests3, MPI_SUCCESS);
-			printf("%d: countwait3\n", world_rank);
+//			printf("%d: countwait3\n", world_rank);
 		}
 
 		person* lowerTopRow= (person*)malloc(lowerTop*sizeof(person));
-		printf("%d: lowerTopRow allocated\n", world_rank);
+//		printf("%d: lowerTopRow allocated\n", world_rank);
 		person* upperBotRow = (person*)malloc(upperBot*sizeof(person));
 
-        printf("%d: upperBot: %d\n", world_rank, upperBot);
-        printf("%d: lowerTop: %d\n", world_rank, lowerTop);
+//        printf("%d: upperBot: %d\n", world_rank, upperBot);
+//        printf("%d: lowerTop: %d\n", world_rank, lowerTop);
 
 
 
@@ -280,46 +281,46 @@ int main(int argc, char** argv) {
 			MPI_Irecv( (upperBotRow), upperBot, mpi_person_type, (world_rank-1)%num_processes, 1, MPI_COMM_WORLD, &row_requests0 );
 		
 		}
-		printf("%d: first one finished\n", world_rank);
+//		printf("%d: first one finished\n", world_rank);
 		if(world_rank!=num_processes-1 && lowerTop > 0){
 			MPI_Irecv( (lowerTopRow), lowerTop, mpi_person_type, (world_rank+1)%num_processes, 1, MPI_COMM_WORLD,&row_requests1 ); //size?
 		
 		}
-		printf("%d: second one finished\n", world_rank);
+//		printf("%d: second one finished\n", world_rank);
 		if(world_rank!=0 && top > 0){
 			MPI_Isend( (topRow), top, mpi_person_type, (num_processes+world_rank-1)%num_processes, 1, MPI_COMM_WORLD,&row_requests2 );
 		}
 
-		printf("%d: third one finished\n", world_rank);
+//		printf("%d: third one finished\n", world_rank);
 		if(world_rank!=num_processes-1 && bot > 0){
 			MPI_Isend( (botRow), bot, mpi_person_type, (world_rank+1)%num_processes, 1, MPI_COMM_WORLD,&row_requests3 );
 		}
 
-		printf("%d: fourth one finished\n", world_rank);
+//		printf("%d: fourth one finished\n", world_rank);
 		
 		if(world_rank!=0 && upperBot > 0){
 			MPI_Wait(&row_requests0, MPI_SUCCESS);
-        	printf("%d: wait1\n", world_rank);
+//        	printf("%d: wait1\n", world_rank);
     	}
     	if(world_rank!=num_processes-1 && lowerTop > 0){
 			MPI_Wait(&row_requests1, MPI_SUCCESS);
-        	printf("%d: wait2\n", world_rank);
+//        	printf("%d: wait2\n", world_rank);
         }
         if(world_rank!=0 && top > 0){
 			MPI_Wait(&row_requests2, MPI_SUCCESS);
-	        printf("%d: wait3\n", world_rank);
+//	        printf("%d: wait3\n", world_rank);
 	    }
 	    if(world_rank!=num_processes-1 && bot > 0){
 			MPI_Wait(&row_requests3, MPI_SUCCESS);
-			printf("%d: Done waiting\n", world_rank);
+//			printf("%d: Done waiting\n", world_rank);
 		}
 
 
         for (int i=0; i < lowerTop; ++i) {
-            printf("%d: LOWERTOP x: %d, y: %d, state: %d\n", world_rank, lowerTopRow[i].x, lowerTopRow[i].y, lowerTopRow[i].state);
+//            printf("%d: LOWERTOP x: %d, y: %d, state: %d\n", world_rank, lowerTopRow[i].x, lowerTopRow[i].y, lowerTopRow[i].state);
         }
         for (int i=0; i < upperBot; ++i) {
-            printf("%d: UPPERBOT x: %d, y: %d, state: %d\n", world_rank, upperBotRow[i].x, upperBotRow[i].y, upperBotRow[i].state);
+//            printf("%d: UPPERBOT x: %d, y: %d, state: %d\n", world_rank, upperBotRow[i].x, upperBotRow[i].y, upperBotRow[i].state);
         }
 
 
@@ -339,7 +340,7 @@ int main(int argc, char** argv) {
 			newPopulation[j] = upperBotRow[j];
             newResult[j] = upperBotRow[j];
 		} 
-        printf("%d: upperBot added to newPopulation\n", world_rank);
+//        printf("%d: upperBot added to newPopulation\n", world_rank);
         
 		for(int j=0;j<lowerTop;j++){
             int h;
@@ -352,14 +353,14 @@ int main(int argc, char** argv) {
 			newPopulation[upperBot+j] = lowerTopRow[j];
             newResult[upperBot+j] = lowerTopRow[j];
 		} 
-        printf("%d: lowerTop added to newPopulation\n", world_rank);
+//        printf("%d: lowerTop added to newPopulation\n", world_rank);
 
 		for(int j=0;j<numPopsHere;j++){
 			newPopulation[upperBot+lowerTop+j] = d_population[j];
 			newResult[upperBot+lowerTop+j] = d_result[j];
 		} 
 
-        printf("%d: new population done\n", world_rank);
+//        printf("%d: new population done\n", world_rank);
 
 		d_population = newPopulation;
         d_result = newResult;
@@ -367,17 +368,17 @@ int main(int argc, char** argv) {
         person *pb = d_population;
         person *rb = d_result;
         for (int i = 0; i < new_pop_size; ++i) {
-            printf("%d:BEFORE KERNEL pop: x: %d, y: %d, state: %d \t|\t res: x: %d, y: %d, state: %d\n", world_rank, pb[i].x, pb[i].y, pb[i].state, rb[i].x, rb[i].y, rb[i].state);
+//            printf("%d:BEFORE KERNEL pop: x: %d, y: %d, state: %d \t|\t res: x: %d, y: %d, state: %d\n", world_rank, pb[i].x, pb[i].y, pb[i].state, rb[i].x, rb[i].y, rb[i].state);
         }
 
-        printf("%d: before kernel\n", world_rank);		
+//        printf("%d: before kernel\n", world_rank);		
 		ret = covid_kernelLaunch( &d_population, &d_result, world_width, amountRows+2, new_pop_size, i, infection_radius, infect_chance, symptom_chance, recovery_time, threshold, behavior1, behavior2, world_rank, num_processes); 
-        printf("%d: after kernel\n", world_rank);		
+//        printf("%d: after kernel\n", world_rank);		
 	
         person *p = d_population;
         person *r = d_result;
         for (int i = 0; i < new_pop_size; ++i) {
-            printf("%d:AFTER KERNEL pop: x: %d, y: %d, state: %d \t|\t res: x: %d, y: %d, state: %d\n", world_rank, p[i].x, p[i].y, p[i].state, r[i].x, r[i].y, r[i].state);
+//            printf("%d:AFTER KERNEL pop: x: %d, y: %d, state: %d \t|\t res: x: %d, y: %d, state: %d\n", world_rank, p[i].x, p[i].y, p[i].state, r[i].x, r[i].y, r[i].state);
         }
 
         // remove people that moved outside
@@ -390,7 +391,7 @@ int main(int argc, char** argv) {
                 actual++;
             }
 		}
-        printf("%d: counted actual pop: %d\n", world_rank, actual);		
+//        printf("%d: counted actual pop: %d\n", world_rank, actual);		
 		actualPopulation = (person*)malloc(sizeof(person)*actual);
 		//actual = 0;
 		int actual_index = 0;
@@ -402,21 +403,25 @@ int main(int argc, char** argv) {
 		}
 		numPopsHere = actual;
         for (int i=0; i < actual; ++i) {
-            printf("%d: ACTUALPOP x: %d, y: %d, state: %d\n", world_rank, actualPopulation[i].x, actualPopulation[i].y, actualPopulation[i].state);
+//            printf("%d: ACTUALPOP x: %d, y: %d, state: %d\n", world_rank, actualPopulation[i].x, actualPopulation[i].y, actualPopulation[i].state);
         }
 		d_population = actualPopulation;
-        printf("%d: inserted actual pop\n", world_rank);		
+        //printf("%d: inserted actual pop\n", world_rank);		
 
 
 		
-		printf("Printing out\n");
+		//printf("Printing out\n");
 		MPI_File_open(MPI_COMM_WORLD, "covid.txt",MPI_MODE_RDWR,MPI_INFO_NULL, &filename);
 		char* toPrint;
-        int print_n = 20;
+        int print_n = 25;
 		toPrint = (char*)malloc((numPopsHere*print_n)*sizeof(char));
 		int offset = (2*i*pop_size + 2*popsPerRank*world_rank)*print_n*sizeof(char);
 		for(int j=0;j<numPopsHere;j++){
             int p_i = 0;
+            char p_block[25];
+            sprintf(p_block, "%d,%d,%c,%d,%d\n", world_rank, i, d_population[j].state == 0 ? 'S' : d_population[j].state == 1 ? 'I' : 'R', d_population[j].x, d_population[j].y);
+            strcat(toPrint, p_block);
+/*
 			toPrint[print_n*j+(p_i++)]='0'+world_rank;
             toPrint[print_n*j+(p_i++)]=',';
             toPrint[print_n*j+(p_i++)] = '0'+i;
@@ -434,6 +439,7 @@ int main(int argc, char** argv) {
             int x_count = numPlaces(d_population[j].x);
             char x_str[10];
             sprintf(x_str, "%d", d_population[j].x);
+            printf("X_STR: %s, XCOUNT: %d\n", x_str, x_count); 
             for (int k=0; k<x_count; ++k){
                 toPrint[print_n*j+(p_i++)] = x_str[k];
             }
@@ -445,13 +451,14 @@ int main(int argc, char** argv) {
                 toPrint[print_n*j+(p_i++)] = y_str[k];
             }
 			toPrint[print_n*j+(p_i++)]='\n';
+*/
 		}
         //toPrint[numPopsHere*print_n] = '\0';
 
-		printf("%s", toPrint);
-		MPI_File_write_at(filename, offset  ,toPrint, amountRows*world_width, MPI_INT,MPI_STATUS_IGNORE);
+		//printf("%s", toPrint);
+		MPI_File_write_at(filename, offset  ,toPrint, strlen(toPrint), MPI_CHAR,MPI_STATUS_IGNORE);
 		MPI_File_close(&filename);
-		printf("%d: Printed out %d day\n", world_rank, i/24);
+		//printf("%d: Printed out %d day\n", world_rank, i/24);
 	}
     
     //MPI_Type_Free(&mpi_person_type);

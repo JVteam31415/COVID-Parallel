@@ -41,7 +41,7 @@ size_t g_popSize = 0;
 curandState *g_state;
 
 extern "C" void covid_initMaster(unsigned int pop_size, size_t world_width, size_t world_height, person** d_population, person** d_result, int myrank, int max_pop) {
-    printf("in init\n");
+    //printf("in init\n");
 
 	g_worldWidth = world_width;
 	g_worldHeight = world_height;
@@ -83,18 +83,18 @@ extern "C" void covid_initMaster(unsigned int pop_size, size_t world_width, size
     (*d_result)[patient_zero].time_infected = 0;
     (*d_result)[patient_zero].symptoms = (int)true;
 
-    printf("before alloc curand\n");    
+//    printf("before alloc curand\n");    
     cudaMallocManaged((void**)&g_state, sizeof(curandState));
-    printf("after alloc curand\n");    
+//    printf("after alloc curand\n");    
 
 
     person *p = *d_population;
     person *r = *d_result;
-    printf("========================INIT_PRINT===============\n");
+//    printf("========================INIT_PRINT===============\n");
     for (int i=0; i < pop_size; ++i) {
-        printf("pop: x: %d, y: %d, state: %d \t|\t res: x: %d, y: %d, state: %d\n", p[i].x, p[i].y, p[i].state, r[i].x, r[i].y, r[i].state);
+//        printf("pop: x: %d, y: %d, state: %d \t|\t res: x: %d, y: %d, state: %d\n", p[i].x, p[i].y, p[i].state, r[i].x, r[i].y, r[i].state);
     }
-    printf("========================INIT_OVER================\n");
+//    printf("========================INIT_OVER================\n");
 
 }
 
@@ -131,7 +131,7 @@ int get_curand(curandState *state, int index, int min, int max) {
     float myrandf = curand_uniform(state);
     myrandf *= (max - min+0.999999);
     myrandf += min;
-    printf("get_curand: %d", (int)truncf(myrandf));
+//    printf("get_curand: %d", (int)truncf(myrandf));
     return (int)truncf(myrandf);
 }
 
@@ -254,7 +254,7 @@ void covid_kernel(
     int numranks,
     curandState *d_state
 ) {
-    printf("%d: kernel start\n", myrank);
+//    printf("%d: kernel start\n", myrank);
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int start_i, end_i, i, infected_count = 0, behavior, nearest_search, new_x, new_y;
     float dist, nearest_dist;
@@ -273,7 +273,7 @@ void covid_kernel(
                         d_result[i].symptoms = (int)roll(symptom_chance, d_state, index);
                         d_result[index].R++;
                     }
-                printf("%d:INFECTION STEP pop: x: %d, y: %d, state: %d \t|\t res: x: %d, y: %d, state: %d\n", myrank, d_population[i].x, d_population[i].y, d_population[i].state, d_result[i].x, d_result[i].y, d_result[i].state);
+//                printf("%d:INFECTION STEP pop: x: %d, y: %d, state: %d \t|\t res: x: %d, y: %d, state: %d\n", myrank, d_population[i].x, d_population[i].y, d_population[i].state, d_result[i].x, d_result[i].y, d_result[i].state);
                 }
             }
             // if no symptoms, roll for chance to start showing symptoms
@@ -296,10 +296,10 @@ void covid_kernel(
             behavior = behavior1;
         }
 
-        printf("%d: MOVEMENT CHECK |||||||||||||||||| y: %d, height: %d\n", myrank, d_population[index].y, world_height-3);
+//        printf("%d: MOVEMENT CHECK |||||||||||||||||| y: %d, height: %d\n", myrank, d_population[index].y, world_height-3);
 
         if (d_population[index].y >= 0 && d_population[index].y <= world_height-3) {
-            printf("%d: PASSED MOVEMENT CHECK\n", myrank);
+//            printf("%d: PASSED MOVEMENT CHECK\n", myrank);
             switch (behavior) {
                 case None: 
                     noRestraints(d_population[index].x, d_population[index].y, time, &new_x, &new_y);
@@ -384,9 +384,9 @@ extern "C" bool covid_kernelLaunch(
     printf("%d: after sort\n", myrank);
 */
 
-    printf("%d: before covid_kernel\n", myrank);
+//    printf("%d: before covid_kernel\n", myrank);
     covid_kernel<<<1,1>>>(*d_population, *d_result, (int)world_width, (int)world_height, time, pop_size, radius, infect_chance, symptom_chance, infect_search, recover, threshold, behavior1, behavior2, myrank, numranks, g_state);
-    printf("%d: after covid_kernel\n", myrank);
+//    printf("%d: after covid_kernel\n", myrank);
 /*
     for (int i=0; i < pop_size; ++i) {
         printf("%d:AFTER KERNEL pop: x: %d, y: %d, state: %d \t|\t res: x: %d, y: %d, state: %d\n", myrank, p[i].x, p[i].y, p[i].state, r[i].x, r[i].y, r[i].state);
