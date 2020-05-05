@@ -59,6 +59,8 @@ int main(int argc, char** argv) {
     // Initialize the MPI environment
     MPI_Init(&argc, &argv);
 
+    double t1 = MPI_Wtime();
+
     unsigned int pop_size, world_width, world_height, infection_radius,  days,  recovery_time, threshold, behavior1, behavior2;
     float infect_chance, symptom_chance;
 
@@ -413,12 +415,12 @@ int main(int argc, char** argv) {
 		//printf("Printing out\n");
 		MPI_File_open(MPI_COMM_WORLD, "covid.txt",MPI_MODE_RDWR,MPI_INFO_NULL, &filename);
 		char* toPrint;
-        int print_n = 25;
+        int print_n = 50;
 		toPrint = (char*)malloc((numPopsHere*print_n)*sizeof(char));
-		int offset = (2*i*pop_size + 2*popsPerRank*world_rank)*print_n*sizeof(char);
+        int offset = (num_processes* i *pop_size + pop_size * world_rank)* print_n * sizeof(char);
 		for(int j=0;j<numPopsHere;j++){
             int p_i = 0;
-            char p_block[25];
+            char p_block[50];
             sprintf(p_block, "%d,%d,%c,%d,%d\n", world_rank, i, d_population[j].state == 0 ? 'S' : d_population[j].state == 1 ? 'I' : 'R', d_population[j].x, d_population[j].y);
             strcat(toPrint, p_block);
 /*
@@ -460,6 +462,10 @@ int main(int argc, char** argv) {
 		MPI_File_close(&filename);
 		//printf("%d: Printed out %d day\n", world_rank, i/24);
 	}
+    
+    double t2 = MPI_Wtime();
+
+    printf("%f\n", t2-t1);
     
     //MPI_Type_Free(&mpi_person_type);
 	MPI_Finalize();
