@@ -6,12 +6,12 @@
 
 typedef struct
 {
-	int x, y, time_infected, R, state;
-	bool symptoms;
+	int x, y, time_infected, R, state, symptoms;
+    // bool symptoms;
 } person;
 //might need to do this for it to compile,  just in case, it's here
 
-extern void covid_initMaster(unsigned int pop_size, size_t world_width, size_t world_height, person** d_population, person** d_result);
+extern void covid_initMaster(unsigned int pop_size, size_t world_width, size_t world_height, person** d_population, person** d_result, int myrank, int max_pop);
 
 extern void setup_kernelLaunch();
 
@@ -68,7 +68,8 @@ int main(int argc, char** argv) {
     // make MPI type for person
     const int nitems = 6;
     int blocklengths[6] = {1,1,1,1,1,1};
-    MPI_Datatype types[6] = {MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_C_BOOL};
+    // MPI_Datatype types[6] = {MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_C_BOOL};
+    MPI_Datatype types[6] = {MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT};
     MPI_Datatype mpi_person_type;
     MPI_Aint offsets[6];
 
@@ -106,9 +107,10 @@ int main(int argc, char** argv) {
     }
     printf("%d: amountRows: %d\n", world_rank, amountRows);
 
-    
     printf("%d: before initMaster\n", world_rank);
-    covid_initMaster( popsPerRank, world_width, amountRows, &d_population, &d_result);
+//==================================================================================================================
+    covid_initMaster( popsPerRank, world_width, amountRows, &d_population, &d_result, world_rank, pop_size);
+//==================================================================================================================
     printf("%d: after initMaster, before setup_kernelLaunch\n", world_rank);
     setup_kernelLaunch();
     printf("%d: after setup_kernelLaunch\n", world_rank);
@@ -136,7 +138,7 @@ int main(int argc, char** argv) {
         printf("%d: p: %d x: %d, y: %d, high: %d, low: %d\n", world_rank, k, d_population[k].x, d_population[k].y, highestRowHere, lowestRowHere);
     }
 
-	for( int i = 0; i <days*24; i++)
+	for( int i = 0; i <days; i++)
 	{
 		printf("started iteration %d of for loop, on processor %d\n", i, world_rank);
 	/*Exchange row data with MPI Ranks
@@ -157,9 +159,11 @@ int main(int argc, char** argv) {
 		int bot = 0;
 		for (int j=0;j<numPopsHere;j++){
 			if(d_population[j].y<=highestRowHere){
+                printf("%d: TOP COUNT y: %d <= %d\n", world_rank, d_population[j].y, highestRowHere);
 				top++;
 			}
 			else if(d_population[j].y>=lowestRowHere){
+                printf("%d: BOT COUNT y: %d >= %d\n", world_rank, d_population[j].y, lowestRowHere);
 				bot++;
 			}
 		}
@@ -171,18 +175,32 @@ int main(int argc, char** argv) {
 		int tc = 0;
 		int bc = 0;
 		int counter = 0;
-		while( (tc<top)&&(bc<bot)){
-            printf("%d: counter: %d, numPopsHere: %d\n", world_rank, counter, numPopsHere);
+		while( (tc<top)||(bc<bot)){
+            //printf("%d: counter: %d, numPopsHere: %d\n", world_rank, counter, numPopsHere);
 			if(d_population[counter].y<=highestRowHere){
+                
+                printf("%d: TOP BUILD counter: %d x: %d, y: %d, state: %d\n", world_rank, counter, d_population[counter].x, d_population[counter].y, d_population[counter].state);
+
 				topRow[tc]=d_population[counter];
 				tc++;
 			}
 			else if(d_population[counter].y>=lowestRowHere){
+
+                printf("%d: BOT BUILD counter: %d x: %d, y: %d, state: %d\n", world_rank, counter, d_population[counter].x, d_population[counter].y, d_population[counter].state);
+
 				botRow[bc]=d_population[counter];
 				bc++;
 			}
 			counter++;
 		}
+
+        for (int i=0; i < top; ++i) {
+            printf("%d: TOP x: %d, y: %d, state: %d\n", world_rank, topRow[i].x, topRow[i].y, topRow[i].state);
+        }
+        for (int i=0; i < bot; ++i) {
+            printf("%d: BOT x: %d, y: %d, state: %d\n", world_rank, botRow[i].x, botRow[i].y, botRow[i].state);
+        }
+
 
 		printf("row 165 %d: populated topRow, botRow\n", world_rank);
 
@@ -264,81 +282,112 @@ int main(int argc, char** argv) {
 		printf("%d: fourth one finished\n", world_rank);
 		
 		if(world_rank!=0 && upperBot > 0){
-			MPI_Wait(&requests0, MPI_SUCCESS);
+			MPI_Wait(&row_requests0, MPI_SUCCESS);
         	printf("%d: wait1\n", world_rank);
     	}
     	if(world_rank!=num_processes-1 && lowerTop > 0){
-			MPI_Wait(&requests1, MPI_SUCCESS);
+			MPI_Wait(&row_requests1, MPI_SUCCESS);
         	printf("%d: wait2\n", world_rank);
         }
         if(world_rank!=0 && top > 0){
-			MPI_Wait(&requests2, MPI_SUCCESS);
+			MPI_Wait(&row_requests2, MPI_SUCCESS);
 	        printf("%d: wait3\n", world_rank);
 	    }
 	    if(world_rank!=num_processes-1 && bot > 0){
-			MPI_Wait(&requests3, MPI_SUCCESS);
+			MPI_Wait(&row_requests3, MPI_SUCCESS);
 			printf("%d: Done waiting\n", world_rank);
 		}
 
-		bool ret;
 
-		person* newPopulation = (person*)malloc( (numPopsHere+upperBot+lowerTop)*sizeof(person));
+        for (int i=0; i < lowerTop; ++i) {
+            printf("%d: LOWERTOP x: %d, y: %d, state: %d\n", world_rank, lowerTopRow[i].x, lowerTopRow[i].y, lowerTopRow[i].state);
+        }
+        for (int i=0; i < upperBot; ++i) {
+            printf("%d: UPPERBOT x: %d, y: %d, state: %d\n", world_rank, upperBotRow[i].x, upperBotRow[i].y, upperBotRow[i].state);
+        }
+
+
+		bool ret;
+        int new_pop_size = numPopsHere + upperBot + lowerTop;
+		person* newPopulation = (person*)malloc( new_pop_size*sizeof(person));
+        person* newResult = (person*)malloc( new_pop_size*sizeof(person));
 		for(int j=0;j<upperBot;j++){
-			upperBotRow[j].y = -1;
+            int h;
+            if (world_rank == 1) { //rank above is 0 which has a diff height
+                h = amountRows + world_height % num_processes;
+		    } else {
+                h = amountRows;
+            }
+            upperBotRow[j].y -= h;
+            
 			newPopulation[j] = upperBotRow[j];
+            newResult[j] = upperBotRow[j];
 		} 
         printf("%d: upperBot added to newPopulation\n", world_rank);
         
 		for(int j=0;j<lowerTop;j++){
-			lowerTopRow[j].y = amountRows;
+            int h;
+            if (world_rank == 1) { //rank above is 0 which has a diff height
+                h = amountRows + world_height % num_processes;
+		    } else {
+                h = amountRows;
+            }
+			lowerTopRow[j].y += h;
 			newPopulation[upperBot+j] = lowerTopRow[j];
+            newResult[upperBot+j] = lowerTopRow[j];
 		} 
         printf("%d: lowerTop added to newPopulation\n", world_rank);
 
 		for(int j=0;j<numPopsHere;j++){
 			newPopulation[upperBot+lowerTop+j] = d_population[j];
+			newResult[upperBot+lowerTop+j] = d_result[j];
 		} 
 
         printf("%d: new population done\n", world_rank);
 
 		d_population = newPopulation;
+        d_result = newResult;
+
+        person *pb = d_population;
+        person *rb = d_result;
+        for (int i = 0; i < new_pop_size; ++i) {
+            printf("%d:BEFORE KERNEL pop: x: %d, y: %d, state: %d \t|\t res: x: %d, y: %d, state: %d\n", world_rank, pb[i].x, pb[i].y, pb[i].state, rb[i].x, rb[i].y, rb[i].state);
+        }
+
         printf("%d: before kernel\n", world_rank);		
-		ret = covid_kernelLaunch( &d_population, &d_result, world_width, amountRows+2, popsPerRank, i, infection_radius, infect_chance, symptom_chance, recovery_time, threshold, behavior1, behavior2, world_rank, num_processes); 
+		ret = covid_kernelLaunch( &d_population, &d_result, world_width, amountRows+2, new_pop_size, i, infection_radius, infect_chance, symptom_chance, recovery_time, threshold, behavior1, behavior2, world_rank, num_processes); 
         printf("%d: after kernel\n", world_rank);		
-		
+	
+        person *p = d_population;
+        person *r = d_result;
+        for (int i = 0; i < new_pop_size; ++i) {
+            printf("%d:AFTER KERNEL pop: x: %d, y: %d, state: %d \t|\t res: x: %d, y: %d, state: %d\n", world_rank, p[i].x, p[i].y, p[i].state, r[i].x, r[i].y, r[i].state);
+        }
+
         // remove people that moved outside
         person *actualPopulation;
+        //person *actualResult;
 		int actual = 0;
 
 		for (int j=0; j<upperBot+lowerTop+numPopsHere;j++ ){
-
-			if(d_population[j].y < highestRowHere){
-
-			}
-			else if(d_population[j].y > lowestRowHere){
-
-			}
-			else{
-				actual++;
-			}
+            if (d_population[j].y >= highestRowHere && d_population[j].y <= lowestRowHere) {
+                actual++;
+            }
 		}
-        printf("%d: counted actual pop\n", world_rank);		
+        printf("%d: counted actual pop: %d\n", world_rank, actual);		
 		actualPopulation = (person*)malloc(sizeof(person)*actual);
-		actual = 0;
+		//actual = 0;
+		int actual_index = 0;
 		for (int j=0; j<upperBot+lowerTop+numPopsHere;j++ ){
-
-			if(d_population[j].y < highestRowHere){
-
-			}
-			else if(d_population[j].y > lowestRowHere){
-
-			}
-			else{
-				actualPopulation[actual] = d_population[j];
-				actual++;
-			}
+            if (d_population[j].y >= highestRowHere && d_population[j].y <= lowestRowHere) {
+				actualPopulation[actual_index] = d_population[j];
+				actual_index++;
+            }
 		}
 		numPopsHere = actual;
+        for (int i=0; i < actual; ++i) {
+            printf("%d: ACTUALPOP x: %d, y: %d, state: %d\n", world_rank, actualPopulation[i].x, actualPopulation[i].y, actualPopulation[i].state);
+        }
 		d_population = actualPopulation;
         printf("%d: inserted actual pop\n", world_rank);		
 
@@ -369,7 +418,7 @@ int main(int argc, char** argv) {
 		
 	}
     
-
+    //MPI_Type_Free(&mpi_person_type);
 	MPI_Finalize();
 	
 

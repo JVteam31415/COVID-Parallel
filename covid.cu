@@ -8,11 +8,12 @@
 #include <math.h>
 #include <curand.h>
 #include <curand_kernel.h>
+#include <time.h>
 
 typedef struct
 {
-	int x, y, time_infected, R, state;
-	bool symptoms;
+	int x, y, time_infected, R, state, symptoms;
+	//bool symptoms;
 } person;
 
 typedef enum {None, Avoid, Central} behavior;
@@ -39,19 +40,19 @@ size_t g_popSize = 0;
 
 curandState *g_state;
 
-extern "C" void covid_initMaster(unsigned int pop_size, size_t world_width, size_t world_height, person** d_population, person** d_result) {
+extern "C" void covid_initMaster(unsigned int pop_size, size_t world_width, size_t world_height, person** d_population, person** d_result, int myrank, int max_pop) {
     printf("in init\n");
 
 	g_worldWidth = world_width;
 	g_worldHeight = world_height;
 	g_popSize = pop_size;
 
-	cudaMallocManaged((void**)d_population, g_popSize*sizeof(person));
-    cudaMallocManaged((void**)d_result, g_popSize*sizeof(person));
+	cudaMallocManaged((void**)d_population, max_pop*sizeof(person));
+    cudaMallocManaged((void**)d_result, max_pop*sizeof(person));
 	//person *world;
 	//cudaMallocManaged((void**)world, g_worldHeight*g_worldWidth*depth*sizeof(person));
 	//g_world = (person (**)[depth]) world;
-
+    srand(time(NULL)+myrank);
 	for (int i=0; i<g_popSize; ++i) {
 		int x = rand() % (g_worldWidth);
 		int y = rand() % (g_worldHeight);
@@ -61,26 +62,40 @@ extern "C" void covid_initMaster(unsigned int pop_size, size_t world_width, size
 		(*d_population)[i].time_infected = -1;
 		(*d_population)[i].R = 0;
 		(*d_population)[i].state = 0;
-		(*d_population)[i].symptoms = false;
+		(*d_population)[i].symptoms = (int)false;
 
 		(*d_result)[i].x = x;
-		(*d_population)[i].y = y;
-		(*d_population)[i].time_infected = -1;
-		(*d_population)[i].R = 0;
-		(*d_population)[i].state = 0;
-		(*d_population)[i].symptoms = false;
+		(*d_result)[i].y = y;
+		(*d_result)[i].time_infected = -1;
+		(*d_result)[i].R = 0;
+		(*d_result)[i].state = 0;
+		(*d_result)[i].symptoms = (int)false;
 	}
 
 
-
+    
     int patient_zero = rand()%pop_size;
     (*d_population)[patient_zero].state = 1;
     (*d_population)[patient_zero].time_infected = 0;
-    (*d_population)[patient_zero].symptoms = true;
+    (*d_population)[patient_zero].symptoms = (int)true;
+
+    (*d_result)[patient_zero].state = 1;
+    (*d_result)[patient_zero].time_infected = 0;
+    (*d_result)[patient_zero].symptoms = (int)true;
 
     printf("before alloc curand\n");    
     cudaMallocManaged((void**)&g_state, sizeof(curandState));
     printf("after alloc curand\n");    
+
+
+    person *p = *d_population;
+    person *r = *d_result;
+    printf("========================INIT_PRINT===============\n");
+    for (int i=0; i < pop_size; ++i) {
+        printf("pop: x: %d, y: %d, state: %d \t|\t res: x: %d, y: %d, state: %d\n", p[i].x, p[i].y, p[i].state, r[i].x, r[i].y, r[i].state);
+    }
+    printf("========================INIT_OVER================\n");
+
 }
 
 //__device__
@@ -239,7 +254,7 @@ void covid_kernel(
     int numranks,
     curandState *d_state
 ) {
-    printf("kernel start\n");
+    printf("%d: kernel start\n", myrank);
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int start_i, end_i, i, infected_count = 0, behavior, nearest_search, new_x, new_y;
     float dist, nearest_dist;
@@ -247,21 +262,23 @@ void covid_kernel(
     while (index < pop_size) {
         // if infected, check within radius to spread infection
         if (d_population[index].state == 1) {
-            start_i = max(index-infect_search, 0);
-            end_i = min(index+infect_search, pop_size-1);
-            for (i = start_i; i < end_i; ++i) {
+            //start_i = max(index-infect_search, 0);
+            //end_i = min(index+infect_search, pop_size-1);
+            //for (i = start_i; i < end_i; ++i) {
+            for (i = 0; i < pop_size; ++i) {
                 if (d_population[i].state == 0 && abs(d_population[i].x - d_population[index].x) <= radius && abs(d_population[i].y - d_population[index].y) <= radius) {
                     if (roll(infect_chance, d_state, index)) {
                         d_result[i].state = 1;
                         d_result[i].time_infected = time;
-                        d_result[i].symptoms = roll(symptom_chance, d_state, index);
+                        d_result[i].symptoms = (int)roll(symptom_chance, d_state, index);
                         d_result[index].R++;
                     }
+                printf("%d:INFECTION STEP pop: x: %d, y: %d, state: %d \t|\t res: x: %d, y: %d, state: %d\n", myrank, d_population[i].x, d_population[i].y, d_population[i].state, d_result[i].x, d_result[i].y, d_result[i].state);
                 }
             }
             // if no symptoms, roll for chance to start showing symptoms
             if (!d_population[index].symptoms) {
-                d_result[i].symptoms = roll(symptom_chance, d_state, index);
+                d_result[i].symptoms = (int)roll(symptom_chance, d_state, index);
             } else { // if showing symptoms add to ifected count
                 infected_count++;
             }
@@ -271,6 +288,7 @@ void covid_kernel(
             }
             // maybe add death infect_chance?
         }
+        // printf("%d: INFECTED COUNT: %d", myrank, infected_count);
         // check global status to decide behavior
         if (infected_count > threshold) {
             behavior = behavior2;    
@@ -278,41 +296,46 @@ void covid_kernel(
             behavior = behavior1;
         }
 
-        switch (behavior) {
-            case None: 
-                noRestraints(d_population[index].x, d_population[index].y, time, &new_x, &new_y);
-                d_result[index].x = new_x; 
-                d_result[index].y = new_y;
-                break;
-            case Avoid:
-                // find nearest
-                nearest_search = (int)(max(world_width, world_height)*3/2)+1;
-                start_i = max(index-nearest_search, 0);
-                end_i = min(index+nearest_search, pop_size-1);
-                for (i=start_i; i < end_i; ++i) {
-                    if (!nearest) {
-                        *nearest = d_population[i];
-                        nearest_dist = sqrt(pow(d_population[i].x- d_population[index].x, 2)+pow(d_population[i].y-d_population[index].y, 2));
-                    }
-                    dist = sqrt(pow(d_population[i].x-d_population[index].x, 2)+pow(d_population[i].y-d_population[index].y, 2));
-                    if (dist < nearest_dist) {
-                        *nearest = d_population[i];
-                        nearest_dist = dist;
-                    }
-                }
-                avoid(d_population[index].x, d_population[index].y, (*nearest).x, (*nearest).y, &new_x, &new_y); 
-                d_result[index].x = new_x; 
-                d_result[index].y = new_y;
-                break;
-            case Central:
-                central(d_population[index].x, d_population[index].y, (int)world_width/2, (int)world_height/2, time, &new_x, &new_y); 
-                d_result[index].x = new_x; 
-                d_result[index].y = new_y;
-                break;
-            default:
-                break;
-        }
+        printf("%d: MOVEMENT CHECK |||||||||||||||||| y: %d, height: %d\n", myrank, d_population[index].y, world_height-3);
 
+        if (d_population[index].y >= 0 && d_population[index].y <= world_height-3) {
+            printf("%d: PASSED MOVEMENT CHECK\n", myrank);
+            switch (behavior) {
+                case None: 
+                    noRestraints(d_population[index].x, d_population[index].y, time, &new_x, &new_y);
+                    d_result[index].x = new_x; 
+                    d_result[index].y = new_y;
+                    break;
+                case Avoid:
+                        // find nearest
+                        //nearest_search = (int)(max(world_width, world_height)*3/2)+1;
+                        //start_i = max(index-nearest_search, 0);
+                        //end_i = min(index+nearest_search, pop_size-1);
+                        //for (i=start_i; i < end_i; ++i) {
+                    for (i=0; i < pop_size; ++i) {
+                        if (!nearest) {
+                            *nearest = d_population[i];
+                            nearest_dist = sqrt(pow(d_population[i].x- d_population[index].x, 2)+pow(d_population[i].y-d_population[index].y, 2));
+                        }
+                        dist = sqrt(pow(d_population[i].x-d_population[index].x, 2)+pow(d_population[i].y-d_population[index].y, 2));
+                        if (dist < nearest_dist) {
+                            *nearest = d_population[i];
+                            nearest_dist = dist;
+                        }
+                    }
+                    avoid(d_population[index].x, d_population[index].y, (*nearest).x, (*nearest).y, &new_x, &new_y); 
+                    d_result[index].x = new_x; 
+                    d_result[index].y = new_y;
+                    break;
+                case Central:
+                    central(d_population[index].x, d_population[index].y, (int)world_width/2, (int)world_height/2, time, &new_x, &new_y); 
+                    d_result[index].x = new_x; 
+                    d_result[index].y = new_y;
+                    break;
+                default:
+                    break;
+            }
+        }
         index += blockDim.x * gridDim.x;
     }
 }
@@ -346,18 +369,29 @@ extern "C" bool covid_kernelLaunch(
     int dim_max = max(world_width, world_height);
     int infect_search = ceil((2*radius + 1) * dim_max / 2);
     //curandState *d_state;
-    
-    printf("before sort\n");
-    qsort(*d_population, pop_size, sizeof(person), compare);
-    printf("after sort\n");
-    printf("before covid_kernel\n");
-    covid_kernel<<<1,1>>>(*d_population, *d_result, (int)world_width, (int)world_height, time, pop_size, radius, infect_chance, symptom_chance, infect_search, recover, threshold, behavior1, behavior2, myrank, numranks, g_state);
-    printf("after covid_kernel\n");
+/*
     person *p = *d_population;
     person *r = *d_result;
+
     for (int i=0; i < pop_size; ++i) {
-        printf("pop: x: %d, y: %d, state: %d -- res: x: %d, y: %d, state: %d\n", p[i].x, p[i].y, p[i].state, r[i].x, r[i].y, r[i].state);
+        printf("%d:BEFORE KERNEL pop: x: %d, y: %d, state: %d \t|\t res: x: %d, y: %d, state: %d\n", myrank, p[i].x, p[i].y, p[i].state, r[i].x, r[i].y, r[i].state);
     }
+*/   
+/* 
+    printf("%d: before sort\n", myrank);
+    qsort(*d_population, pop_size, sizeof(person), compare);
+    qsort(*d_result, pop_size, sizeof(person), compare);
+    printf("%d: after sort\n", myrank);
+*/
+
+    printf("%d: before covid_kernel\n", myrank);
+    covid_kernel<<<1,1>>>(*d_population, *d_result, (int)world_width, (int)world_height, time, pop_size, radius, infect_chance, symptom_chance, infect_search, recover, threshold, behavior1, behavior2, myrank, numranks, g_state);
+    printf("%d: after covid_kernel\n", myrank);
+/*
+    for (int i=0; i < pop_size; ++i) {
+        printf("%d:AFTER KERNEL pop: x: %d, y: %d, state: %d \t|\t res: x: %d, y: %d, state: %d\n", myrank, p[i].x, p[i].y, p[i].state, r[i].x, r[i].y, r[i].state);
+    }
+*/
     covid_swap(d_population, d_result);
     cudaDeviceSynchronize();
     return true;
