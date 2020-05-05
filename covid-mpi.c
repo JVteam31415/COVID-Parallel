@@ -392,30 +392,40 @@ int main(int argc, char** argv) {
         printf("%d: inserted actual pop\n", world_rank);		
 
 
-		if(days%24==23){
-			//write to file
-			MPI_File_open(MPI_COMM_WORLD, "covid.txt",MPI_MODE_RDWR,MPI_INFO_NULL, &filename);
-			char* toPrint;
-			toPrint = (char*)malloc((amountRows*world_width)*sizeof(char));
-			for(int j=0;j<numPopsHere;j++){
-				/*if(d_population[j] == NULL){
-					toPrint[j]=' ';
-				}
-				else*/ if (d_population[j].state == 0 ){
-					toPrint[j] = 'S';
-				}
-				else if(d_population[j].state == 1 ){
-					toPrint[j] = 'I';
-				}
-				else{
-					toPrint[j] = 'R';
-				}
-			}
-			MPI_File_write(filename,toPrint  ,amountRows*world_width, MPI_INT,MPI_STATUS_IGNORE);
-			MPI_File_close(&filename);
-			printf("%d: Printed out %d day\n", world_rank, i/24);
-		}
 		
+		printf("Printing out\n");
+		MPI_File_open(MPI_COMM_WORLD, "covid.txt",MPI_MODE_RDWR,MPI_INFO_NULL, &filename);
+		char* toPrint;
+		toPrint = (char*)malloc((numPopsHere*5)*sizeof(char));
+		int offset = (i*pop_size + 2*popsPerRank)*5*sizeof(char);
+		for(int j=0;j<numPopsHere;j++){
+			if (d_population[j].state == 0 ){
+				toPrint[5*j] = 'S';
+				toPrint[5*j+1]=d_population[j].x+'0';
+				toPrint[5*j+2]=d_population[j].y+'0';
+				toPrint[5*j+3]='0'+world_rank;
+				toPrint[5*j+4]='\n';
+
+			}
+			else if(d_population[j].state == 1 ){
+				toPrint[5*j] = 'I';
+				toPrint[5*j+1]=d_population[j].x+'0';
+				toPrint[5*j+2]=d_population[j].y+'0';
+				toPrint[5*j+3]='0'+world_rank;
+				toPrint[5*j+4]='\n';
+			}
+			else{
+				toPrint[5*j] = 'R';
+				toPrint[5*j+1]=d_population[j].x+'0';
+				toPrint[5*j+2]=d_population[j].y+'0';
+				toPrint[5*j+3]='0'+world_rank;
+				toPrint[5*j+4]='\n';
+			}
+		}
+		printf(toPrint);
+		MPI_File_write_at(filename, offset  ,toPrint, amountRows*world_width, MPI_INT,MPI_STATUS_IGNORE);
+		MPI_File_close(&filename);
+		printf("%d: Printed out %d day\n", world_rank, i/24);
 	}
     
     //MPI_Type_Free(&mpi_person_type);
