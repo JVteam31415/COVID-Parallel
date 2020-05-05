@@ -11,7 +11,9 @@ typedef struct
 } person;
 //might need to do this for it to compile,  just in case, it's here
 
-extern void covid_initMaster(unsigned int pop_size, size_t world_width, size_t world_height, person** d_population);
+extern void covid_initMaster(unsigned int pop_size, size_t world_width, size_t world_height, person** d_population, person** d_result);
+
+extern void setup_kernelLaunch();
 
 extern bool covid_kernelLaunch(
     person** d_population, 
@@ -42,7 +44,6 @@ int main(int argc, char** argv) {
 
     unsigned int pop_size, world_width, world_height, infection_radius,  days,  recovery_time, threshold, behavior1, behavior2;
     float infect_chance, symptom_chance;
-	
 
     if( argc != 12 )
     {
@@ -89,9 +90,12 @@ int main(int argc, char** argv) {
     }
     printf("%d: amountRows: %d\n", world_rank, amountRows);
 
-
-    covid_initMaster( popsPerRank, world_width, amountRows, &d_population );
-
+    
+    printf("%d: before initMaster\n", world_rank);
+    covid_initMaster( popsPerRank, world_width, amountRows, &d_population, &d_result);
+    printf("%d: after initMaster, before setup_kernelLaunch\n", world_rank);
+    setup_kernelLaunch();
+    printf("%d: after setup_kernelLaunch\n", world_rank);
 
     int numPopsHere = popsPerRank;
 
@@ -332,3 +336,4 @@ int main(int argc, char** argv) {
 	
 
 }
+

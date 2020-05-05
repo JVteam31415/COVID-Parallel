@@ -8,6 +8,7 @@
 #include <math.h>
 #include <curand.h>
 #include <curand_kernel.h>
+
 typedef struct
 {
 	int x, y, time_infected, R, state;
@@ -36,17 +37,14 @@ size_t g_worldHeight=0;
 
 size_t g_popSize = 0;
 
-extern "C" void covid_initMaster(unsigned int pop_size, size_t world_width, size_t world_height, person** d_population, person** d_result, curandState **d_state) {
+curandState *g_state;
+
+extern "C" void covid_initMaster(unsigned int pop_size, size_t world_width, size_t world_height, person** d_population, person** d_result) {
+    printf("in init\n");
+
 	g_worldWidth = world_width;
 	g_worldHeight = world_height;
 	g_popSize = pop_size;
-
-
-	// 
-	int world_area = g_worldHeight * g_worldWidth;
-	float pop_density = g_popSize / world_area;
-	int depth = ceil(pop_density)*5;
-
 
 	cudaMallocManaged((void**)d_population, g_popSize*sizeof(person));
     cudaMallocManaged((void**)d_result, g_popSize*sizeof(person));
@@ -73,12 +71,16 @@ extern "C" void covid_initMaster(unsigned int pop_size, size_t world_width, size
 		(*d_population)[i].symptoms = false;
 	}
 
+
+
     int patient_zero = rand()%pop_size;
     (*d_population)[patient_zero].state = 1;
     (*d_population)[patient_zero].time_infected = 0;
     (*d_population)[patient_zero].symptoms = true;
-    
-    cudaMallocManaged((void**)d_state, sizeof(curandState));
+
+    printf("before alloc curand\n");    
+    cudaMallocManaged((void**)&g_state, sizeof(curandState));
+    printf("after alloc curand\n");    
 }
 
 //__device__
@@ -110,8 +112,8 @@ int min(int a, int b) {
 */
 __device__
 int get_curand(curandState *state, int index, int min, int max) {
-    https://stackoverflow.com/a/18501534/13254229
-    float myrandf = curand_uniform(state+index);
+    // https://stackoverflow.com/a/18501534/13254229
+    float myrandf = curand_uniform(state);
     myrandf *= (max - min+0.999999);
     myrandf += min;
     printf("get_curand: %d", (int)truncf(myrandf));
@@ -237,7 +239,7 @@ void covid_kernel(
     int numranks,
     curandState *d_state
 ) {
-
+    printf("kernel start\n");
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int start_i, end_i, i, infected_count = 0, behavior, nearest_search, new_x, new_y;
     float dist, nearest_dist;
@@ -320,6 +322,10 @@ __global__ void setup_kernel(curandState *state){
     curand_init(1234, idx, 0, &state[idx]);
 }
 
+extern "C" void setup_kernelLaunch() {
+    setup_kernel<<<1,1>>>(g_state);
+}
+
 extern "C" bool covid_kernelLaunch(
     person** d_population, 
     person** d_result, 
@@ -335,8 +341,7 @@ extern "C" bool covid_kernelLaunch(
     int behavior1, 
     int behavior2, 
     int myrank, 
-    int numranks,
-    curandState *d_state
+    int numranks
 ) {
     int dim_max = max(world_width, world_height);
     int infect_search = ceil((2*radius + 1) * dim_max / 2);
@@ -346,19 +351,24 @@ extern "C" bool covid_kernelLaunch(
     qsort(*d_population, pop_size, sizeof(person), compare);
     printf("after sort\n");
     printf("before covid_kernel\n");
-    covid_kernel<<<1,1>>>(*d_population, *d_result, (int)world_width, (int)world_height, time, pop_size, radius, infect_chance, symptom_chance, infect_search, recover, threshold, behavior1, behavior2, myrank, numranks, d_state);
+    covid_kernel<<<1,1>>>(*d_population, *d_result, (int)world_width, (int)world_height, time, pop_size, radius, infect_chance, symptom_chance, infect_search, recover, threshold, behavior1, behavior2, myrank, numranks, g_state);
     printf("after covid_kernel\n");
+    person *p = *d_population;
+    person *r = *d_result;
+    for (int i=0; i < pop_size; ++i) {
+        printf("pop: x: %d, y: %d, state: %d -- res: x: %d, y: %d, state: %d\n", p[i].x, p[i].y, p[i].state, r[i].x, r[i].y, r[i].state);
+    }
     covid_swap(d_population, d_result);
     cudaDeviceSynchronize();
     return true;
 }
-
+/*
 int main(int argc, char *argv[]) {
 	unsigned int pop_size = 70, 
                  world_width = 13, 
                  world_height = 13, 
                  infection_radius = 2, 
-                 iterations = 1,
+                 iterations = 4,
                  recover = 7*24,
                  threshold = 10,
                  behavior1 = 0,
@@ -377,19 +387,20 @@ int main(int argc, char *argv[]) {
 	//unsigned int timesteps = days*24;
 	srand(time(0));
     printf("before init\n");
-	covid_initMaster(pop_size, world_width, world_height, &g_population, &g_result, &d_state);
+	covid_initMaster(pop_size, world_width, world_height, &g_population, &g_result);
     printf("after init\n");
 
     printf("before setup_kernel\n");
-    setup_kernel<<<1,1>>>(d_state);
+    setup_kernelLaunch();
     printf("after setup_kernel\n");
     //for (int i=0; i < g_popSize; ++i) {
     //    printf("%d, %d\n", g_population[i].x, g_population[i].y);
     //}
     for (int i = 0; i < iterations; ++i) {
         printf("iteration: %d\n", i);
-        covid_kernelLaunch(&g_population, &g_result, world_width, world_height, pop_size, i, infection_radius, infect_chance, symptom_chance, recover, threshold, behavior1, behavior2, world_rank, num_processes, d_state);
+        covid_kernelLaunch(&g_population, &g_result, world_width, world_height, pop_size, i, infection_radius, infect_chance, symptom_chance, recover, threshold, behavior1, behavior2, world_rank, num_processes);
     }
 
 }
+*/
 
