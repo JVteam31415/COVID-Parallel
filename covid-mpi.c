@@ -65,6 +65,22 @@ int main(int argc, char** argv) {
     behavior1 = atoi(argv[10]);
     behavior2 = atoi(argv[11]); 
 
+    // make MPI type for person
+    const int nitems = 6;
+    int blocklengths[6] = {1,1,1,1,1,1};
+    MPI_Datatype types[6] = {MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_C_BOOL};
+    MPI_Datatype mpi_person_type;
+    MPI_Aint offsets[6];
+
+    offsets[0] = offsetof(person, x);
+    offsets[1] = offsetof(person, y);
+    offsets[2] = offsetof(person, time_infected);
+    offsets[3] = offsetof(person, R);
+    offsets[4] = offsetof(person, state);
+    offsets[5] = offsetof(person, symptoms);
+
+    MPI_Type_create_struct(nitems, blocklengths, offsets, types, &mpi_person_type);
+    MPI_Type_commit(&mpi_person_type);
 
     // Get the rank of the process
     int world_rank;
@@ -156,6 +172,7 @@ int main(int argc, char** argv) {
 		int bc = 0;
 		int counter = 0;
 		while( (tc<top)&&(bc<bot)){
+            printf("%d: counter: %d, numPopsHere: %d\n", world_rank, counter, numPopsHere);
 			if(d_population[counter].y<=highestRowHere){
 				topRow[tc]=d_population[counter];
 				tc++;
@@ -177,12 +194,12 @@ int main(int argc, char** argv) {
 		int upperBot;
 		int lowerTop;
 		if(world_rank!=0){
-			MPI_Irecv( &(upperBot), 1, MPI_INT, (world_rank+1)%num_processes, 1, MPI_COMM_WORLD, &requests0 );
+			MPI_Irecv( &(upperBot), 1, MPI_INT, (world_rank-1)%num_processes, 1, MPI_COMM_WORLD, &requests0 );
 		
 		}
 		printf("%d: 1 finished\n", world_rank);
 		if(world_rank!=num_processes-1){
-			MPI_Irecv( &(lowerTop), 1, MPI_INT, (world_rank-1)%num_processes, 1, MPI_COMM_WORLD,&requests1 ); //size?
+			MPI_Irecv( &(lowerTop), 1, MPI_INT, (world_rank+1)%num_processes, 1, MPI_COMM_WORLD,&requests1 ); //size?
 		
 		}
 		printf("%d: 2 finished\n", world_rank);
@@ -215,22 +232,22 @@ int main(int argc, char** argv) {
 
 
 		if(world_rank!=0 && upperBot > 0){
-			MPI_Irecv( (upperBotRow), upperBot, MPI_INT, (world_rank-1)%num_processes, 1, MPI_COMM_WORLD, &requests0 );
+			MPI_Irecv( (upperBotRow), upperBot, mpi_person_type, (world_rank-1)%num_processes, 1, MPI_COMM_WORLD, &requests0 );
 		
 		}
 		printf("%d: first one finished\n", world_rank);
 		if(world_rank!=num_processes-1 && lowerTop > 0){
-			MPI_Irecv( (lowerTopRow), lowerTop, MPI_INT, (world_rank+1)%num_processes, 1, MPI_COMM_WORLD,&requests1 ); //size?
+			MPI_Irecv( (lowerTopRow), lowerTop, mpi_person_type, (world_rank+1)%num_processes, 1, MPI_COMM_WORLD,&requests1 ); //size?
 		
 		}
 		printf("%d: second one finished\n", world_rank);
 		if(world_rank!=0 && top > 0){
-			MPI_Isend( (topRow), top, MPI_INT, (num_processes+world_rank-1)%num_processes, 1, MPI_COMM_WORLD,&requests2 );
+			MPI_Isend( (topRow), top, mpi_person_type, (num_processes+world_rank-1)%num_processes, 1, MPI_COMM_WORLD,&requests2 );
 		}
 
 		printf("%d: third one finished\n", world_rank);
 		if(world_rank!=num_processes-1 && bot > 0){
-			MPI_Isend( (botRow), bot, MPI_INT, (world_rank+1)%num_processes, 1, MPI_COMM_WORLD,&requests3 );
+			MPI_Isend( (botRow), bot, mpi_person_type, (world_rank+1)%num_processes, 1, MPI_COMM_WORLD,&requests3 );
 		}
 
 		printf("%d: fourth one finished\n", world_rank);
