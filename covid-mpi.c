@@ -231,23 +231,29 @@ int main(int argc, char** argv) {
         printf("%d: lowerTop: %d\n", world_rank, lowerTop);
 
 
+
+		MPI_Request row_requests0;
+		MPI_Request row_requests1;
+		MPI_Request row_requests2;
+		MPI_Request row_requests3;
+
 		if(world_rank!=0 && upperBot > 0){
-			MPI_Irecv( (upperBotRow), upperBot, mpi_person_type, (world_rank-1)%num_processes, 1, MPI_COMM_WORLD, &requests0 );
+			MPI_Irecv( (upperBotRow), upperBot, mpi_person_type, (world_rank-1)%num_processes, 1, MPI_COMM_WORLD, &row_requests0 );
 		
 		}
 		printf("%d: first one finished\n", world_rank);
 		if(world_rank!=num_processes-1 && lowerTop > 0){
-			MPI_Irecv( (lowerTopRow), lowerTop, mpi_person_type, (world_rank+1)%num_processes, 1, MPI_COMM_WORLD,&requests1 ); //size?
+			MPI_Irecv( (lowerTopRow), lowerTop, mpi_person_type, (world_rank+1)%num_processes, 1, MPI_COMM_WORLD,&row_requests1 ); //size?
 		
 		}
 		printf("%d: second one finished\n", world_rank);
 		if(world_rank!=0 && top > 0){
-			MPI_Isend( (topRow), top, mpi_person_type, (num_processes+world_rank-1)%num_processes, 1, MPI_COMM_WORLD,&requests2 );
+			MPI_Isend( (topRow), top, mpi_person_type, (num_processes+world_rank-1)%num_processes, 1, MPI_COMM_WORLD,&row_requests2 );
 		}
 
 		printf("%d: third one finished\n", world_rank);
 		if(world_rank!=num_processes-1 && bot > 0){
-			MPI_Isend( (botRow), bot, mpi_person_type, (world_rank+1)%num_processes, 1, MPI_COMM_WORLD,&requests3 );
+			MPI_Isend( (botRow), bot, mpi_person_type, (world_rank+1)%num_processes, 1, MPI_COMM_WORLD,&row_requests3 );
 		}
 
 		printf("%d: fourth one finished\n", world_rank);
@@ -268,11 +274,13 @@ int main(int argc, char** argv) {
 			upperBotRow[j].y = -1;
 			newPopulation[j] = upperBotRow[j];
 		} 
-
+        printf("%d: upperBot added to newPopulation\n", world_rank);
+        
 		for(int j=0;j<lowerTop;j++){
 			lowerTopRow[j].y = amountRows;
 			newPopulation[upperBot+j] = lowerTopRow[j];
 		} 
+        printf("%d: lowerTop added to newPopulation\n", world_rank);
 
 		for(int j=0;j<numPopsHere;j++){
 			newPopulation[upperBot+lowerTop+j] = d_population[j];
