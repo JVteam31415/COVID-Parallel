@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <limits.h>
 
 typedef struct
 {
@@ -37,6 +38,21 @@ extern bool covid_kernelLaunch(
 person *d_population=NULL;
 person *d_result=NULL; //
 
+int numPlaces (int n) {
+    if (n < 0) n = (n == INT_MIN) ? INT_MAX : -n;
+    if (n < 10) return 1;
+    if (n < 100) return 2;
+    if (n < 1000) return 3;
+    if (n < 10000) return 4;
+    if (n < 100000) return 5;
+    if (n < 1000000) return 6;
+    if (n < 10000000) return 7;
+    if (n < 100000000) return 8;
+    if (n < 1000000000) return 9;
+    /*      2147483647 is 2^31-1 - add more ifs as needed
+ *             and adjust this final return as well. */
+    return 10;
+}
 
 int main(int argc, char** argv) {
     // Initialize the MPI environment
@@ -396,33 +412,43 @@ int main(int argc, char** argv) {
 		printf("Printing out\n");
 		MPI_File_open(MPI_COMM_WORLD, "covid.txt",MPI_MODE_RDWR,MPI_INFO_NULL, &filename);
 		char* toPrint;
-		toPrint = (char*)malloc((numPopsHere*5)*sizeof(char));
-		int offset = (i*pop_size + 2*popsPerRank)*5*sizeof(char);
+        int print_n = 20;
+		toPrint = (char*)malloc((numPopsHere*print_n)*sizeof(char));
+		int offset = (2*i*pop_size + 2*popsPerRank*world_rank)*print_n*sizeof(char);
 		for(int j=0;j<numPopsHere;j++){
+            int p_i = 0;
+			toPrint[print_n*j+(p_i++)]='0'+world_rank;
+            toPrint[print_n*j+(p_i++)]=',';
+            toPrint[print_n*j+(p_i++)] = '0'+i;
+            toPrint[print_n*j+(p_i++)]=',';
 			if (d_population[j].state == 0 ){
-				toPrint[5*j] = 'S';
-				toPrint[5*j+1]=d_population[j].x+'0';
-				toPrint[5*j+2]=d_population[j].y+'0';
-				toPrint[5*j+3]='0'+world_rank;
-				toPrint[5*j+4]='\n';
-
+				toPrint[print_n*j+(p_i++)] = 'S';
 			}
 			else if(d_population[j].state == 1 ){
-				toPrint[5*j] = 'I';
-				toPrint[5*j+1]=d_population[j].x+'0';
-				toPrint[5*j+2]=d_population[j].y+'0';
-				toPrint[5*j+3]='0'+world_rank;
-				toPrint[5*j+4]='\n';
+				toPrint[print_n*j+(p_i++)] = 'I';
 			}
 			else{
-				toPrint[5*j] = 'R';
-				toPrint[5*j+1]=d_population[j].x+'0';
-				toPrint[5*j+2]=d_population[j].y+'0';
-				toPrint[5*j+3]='0'+world_rank;
-				toPrint[5*j+4]='\n';
+				toPrint[print_n*j+(p_i++)] = 'R';
 			}
+            toPrint[print_n*j+(p_i++)] = ',';
+            int x_count = numPlaces(d_population[j].x);
+            char x_str[10];
+            sprintf(x_str, "%d", d_population[j].x);
+            for (int k=0; k<x_count; ++k){
+                toPrint[print_n*j+(p_i++)] = x_str[k];
+            }
+            toPrint[print_n*j+(p_i++)] = ',';
+            int y_count = numPlaces(d_population[j].y);
+            char y_str[10]; 
+            sprintf(y_str, "%d", d_population[j].y);
+            for (int k=60; k<y_count; ++k){
+                toPrint[print_n*j+(p_i++)] = y_str[k];
+            }
+			toPrint[print_n*j+(p_i++)]='\n';
 		}
-		printf(toPrint);
+        //toPrint[numPopsHere*print_n] = '\0';
+
+		printf("%s", toPrint);
 		MPI_File_write_at(filename, offset  ,toPrint, amountRows*world_width, MPI_INT,MPI_STATUS_IGNORE);
 		MPI_File_close(&filename);
 		printf("%d: Printed out %d day\n", world_rank, i/24);
